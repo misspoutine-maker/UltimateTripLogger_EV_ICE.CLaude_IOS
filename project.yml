@@ -1,0 +1,27 @@
+name: UltimateTripLogger
+options:
+  bundleIdPrefix: com.bebeluga
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  UltimateTripLogger:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bebeluga.ultimatetriplogger
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Ultimate Trip Logger
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIBackgroundModes: [location]
+        NSLocationWhenInUseUsageDescription: "Ultimate Trip Logger utilise votre position pour enregistrer vos trajets."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "L'enregistrement du trajet continue quand l'écran est verrouillé."
