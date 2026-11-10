@@ -103,7 +103,15 @@ struct TripDetailView: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         header(trip)
+                        if trip.points.count >= 2 || !trip.stages.isEmpty {
+                            RouteMapView(points: trip.points, stages: trip.stages)
+                                .frame(height: 260)
+                                .cornerRadius(14)
+                        }
                         stats(trip)
+                        if trip.points.filter({ $0.alt != 0 }).count >= 2 {
+                            AltitudeProfileView(points: trip.points)
+                        }
                         ForEach(trip.stages) { stage in
                             StageRow(stage: stage)
                         }
@@ -128,8 +136,13 @@ struct TripDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    if let trip = trip, let url = CsvExporter.tripCSV(trip) { share = ShareItem(url: url) }
+                Menu {
+                    Button("Exporter en CSV") {
+                        if let trip = trip, let url = CsvExporter.tripCSV(trip) { share = ShareItem(url: url) }
+                    }
+                    Button("Exporter en PDF") {
+                        if let trip = trip, let url = PdfExporter.tripPDF(trip) { share = ShareItem(url: url) }
+                    }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }

@@ -53,6 +53,10 @@ struct LiveTripView: View {
                     SpeedGauge(speed: t.speedKmh)
                     metrics
                     actions
+                    Text(AppInfo.versionString)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textSecondary)
+                        .padding(.top, 6)
                 }
                 .padding(16)
             }

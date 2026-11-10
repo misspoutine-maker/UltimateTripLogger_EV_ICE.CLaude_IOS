@@ -29,6 +29,8 @@ struct RootView: View {
         TabView {
             LiveTripView()
                 .tabItem { Label("Trajet", systemImage: "speedometer") }
+            RecapView(store: tracker.store)
+                .tabItem { Label("Récap", systemImage: "chart.bar.fill") }
             HistoryView(store: tracker.store)
                 .tabItem { Label("Historique", systemImage: "clock.arrow.circlepath") }
         }
