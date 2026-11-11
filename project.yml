@@ -20,6 +20,8 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Ultimate Trip Logger
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIBackgroundModes: [location]
