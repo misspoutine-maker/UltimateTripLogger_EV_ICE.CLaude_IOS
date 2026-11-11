@@ -1,12 +1,13 @@
 import SwiftUI
 
 enum LiveSheet: Identifiable {
-    case start, endStop, endTrip
+    case start, endStop, endTrip, settings
     var id: Int {
         switch self {
         case .start: return 0
         case .endStop: return 1
         case .endTrip: return 2
+        case .settings: return 3
         }
     }
 }
@@ -31,7 +32,7 @@ struct SpeedGauge: View {
                 Text("\(Int(speed))")
                     .font(.system(size: 64, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
-                Text("km/h")
+                Text(tr("km/h"))
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(Theme.textSecondary)
             }
@@ -42,7 +43,28 @@ struct SpeedGauge: View {
 
 struct LiveTripView: View {
     @EnvironmentObject var t: TrackingManager
+    @AppStorage("vehicle") private var vehicle = "ev"
     @State private var sheet: LiveSheet?
+
+    private var cityText: String {
+        return t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city
+    }
+
+    private var stopTypes: [StageType] {
+        switch vehicle {
+        case "ice": return [.refuel, .meal, .other]
+        case "hybrid": return [.charging, .refuel, .chargingMeal, .meal, .other]
+        default: return [.charging, .chargingMeal, .meal, .other]
+        }
+    }
+
+    private var sinceLabel: String {
+        switch vehicle {
+        case "ice": return "Depuis le dernier plein"
+        case "hybrid": return "Depuis la dernière recharge / le dernier plein"
+        default: return "Depuis la dernière recharge"
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -66,6 +88,7 @@ struct LiveTripView: View {
             case .start: StartSheet().environmentObject(t)
             case .endStop: EndStopSheet().environmentObject(t)
             case .endTrip: EndTripSheet().environmentObject(t)
+            case .settings: SettingsSheet()
             }
         }
     }
@@ -74,7 +97,7 @@ struct LiveTripView: View {
         HStack(spacing: 10) {
             Image(systemName: "location.fill").foregroundColor(Theme.blue)
             VStack(alignment: .leading, spacing: 2) {
-                Text(t.city)
+                Text(cityText)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 if !t.address.isEmpty {
@@ -86,9 +109,16 @@ struct LiveTripView: View {
             }
             Spacer()
             if t.isTracking {
-                Text("● REC")
+                Text(tr("● REC"))
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(Theme.red)
+            }
+            Button {
+                sheet = .settings
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .foregroundColor(Theme.textSecondary)
+                    .padding(6)
             }
         }
         .padding(14)
@@ -101,22 +131,24 @@ struct LiveTripView: View {
     private var metrics: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                MetricCard(label: "Vitesse moy.", value: Fmt.speed(t.avgSpeedKmh))
-                MetricCard(label: "Distance", value: Fmt.km(t.distanceMeters))
-                MetricCard(label: "Durée", value: Fmt.hms(t.tripSeconds))
+                MetricCard(label: tr("Vitesse moy."), value: Fmt.speed(t.avgSpeedKmh))
+                MetricCard(label: tr("Distance"), value: Fmt.km(t.distanceMeters))
+                MetricCard(label: tr("Durée"), value: Fmt.hms(t.tripSeconds))
             }
             if t.altitude != 0 || t.elevationGain > 0 {
                 HStack(spacing: 8) {
-                    MetricCard(label: "Altitude", value: Fmt.meters(t.altitude))
-                    MetricCard(label: "Dénivelé +", value: Fmt.meters(t.elevationGain))
+                    MetricCard(label: tr("Altitude"), value: Fmt.meters(t.altitude))
+                    MetricCard(label: tr("Dénivelé +"), value: Fmt.meters(t.elevationGain))
                 }
             }
             if t.isTracking {
                 HStack {
-                    Image(systemName: "bolt.fill").foregroundColor(Theme.blue)
-                    Text("Depuis la dernière recharge")
+                    Image(systemName: vehicle == "ice" ? "fuelpump.fill" : "bolt.fill").foregroundColor(Theme.blue)
+                    Text(tr(sinceLabel))
                         .font(.system(size: 12))
                         .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     Spacer()
                     Text(Fmt.km(t.sinceChargeMeters))
                         .font(.system(size: 13, weight: .bold))
@@ -139,7 +171,7 @@ struct LiveTripView: View {
             }
         } else if let stop = t.activeStop {
             VStack(spacing: 10) {
-                Text("\(stop.label) en cours")
+                Text(stop.label + " " + tr("en cours"))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(Theme.color(for: stop))
                 Text(Fmt.hms(t.activeStopSeconds))
@@ -155,13 +187,14 @@ struct LiveTripView: View {
             .cornerRadius(14)
         } else {
             VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    stopButton(.charging)
-                    stopButton(.chargingMeal)
-                }
-                HStack(spacing: 10) {
-                    stopButton(.meal)
-                    stopButton(.other)
+                let types = stopTypes
+                let rows = stride(from: 0, to: types.count, by: 2).map { Array(types[$0 ..< min($0 + 2, types.count)]) }
+                ForEach(0..<rows.count, id: \.self) { i in
+                    HStack(spacing: 10) {
+                        ForEach(rows[i], id: \.self) { type in
+                            stopButton(type)
+                        }
+                    }
                 }
                 bigButton("TERMINER LE TRAJET", icon: "flag.checkered", color: Theme.red) {
                     sheet = .endTrip
@@ -194,7 +227,7 @@ struct LiveTripView: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                Text(title).font(.system(size: 17, weight: .heavy))
+                Text(tr(title)).font(.system(size: 17, weight: .heavy))
             }
             .foregroundColor(Theme.background)
             .frame(maxWidth: .infinity)
@@ -205,24 +238,86 @@ struct LiveTripView: View {
     }
 }
 
+struct SettingsSheet: View {
+    @AppStorage("lang") private var lang = "auto"
+    @AppStorage("vehicle") private var vehicle = "ev"
+    @AppStorage("fuelUnit") private var fuelUnit = "l"
+    @Environment(\.presentationMode) var presentation
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(tr("Type de véhicule")).font(.caption).foregroundColor(Theme.textSecondary)
+                        Picker("", selection: $vehicle) {
+                            Text(tr("Électrique")).tag("ev")
+                            Text(tr("Essence")).tag("ice")
+                            Text(tr("Hybride")).tag("hybrid")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
+                    if vehicle != "ev" {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(tr("Unité de carburant")).font(.caption).foregroundColor(Theme.textSecondary)
+                            Picker("", selection: $fuelUnit) {
+                                Text(tr("Litres (L)")).tag("l")
+                                Text(tr("Gallons (gal)")).tag("gal")
+                            }
+                            .pickerStyle(SegmentedPickerStyle())
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(tr("Langue")).font(.caption).foregroundColor(Theme.textSecondary)
+                        Picker("", selection: $lang) {
+                            Text(tr("Auto")).tag("auto")
+                            Text(tr("Français")).tag("fr")
+                            Text(tr("English")).tag("en")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
+                    Spacer()
+                    Text(AppInfo.versionString)
+                        .font(.system(size: 12))
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(16)
+            }
+            .navigationTitle(tr("Réglages"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("OK")) { presentation.wrappedValue.dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
 struct StartSheet: View {
     @EnvironmentObject var t: TrackingManager
     @Environment(\.presentationMode) var presentation
     @State private var place = ""
     @State private var soc = ""
+    @AppStorage("vehicle") private var vehicle = "ev"
 
     var body: some View {
         NavigationView {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 VStack(spacing: 16) {
-                    LabeledField(label: "Lieu de départ (optionnel)", placeholder: t.city, text: $place)
-                    LabeledField(label: "Batterie au départ en % (optionnel)", placeholder: "ex. 90", text: $soc, keyboard: .numberPad)
+                    LabeledField(label: tr("Lieu de départ (optionnel)"), placeholder: t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city, text: $place)
+                    if vehicle != "ice" {
+                        LabeledField(label: tr("Batterie au départ en % (optionnel)"), placeholder: tr("ex. 90"), text: $soc, keyboard: .numberPad)
+                    }
                     Button {
                         t.startTrip(place: place.trimmingCharacters(in: .whitespaces), soc: parseSoc(soc))
                         presentation.wrappedValue.dismiss()
                     } label: {
-                        Text("Démarrer")
+                        Text(tr("Démarrer"))
                             .font(.system(size: 17, weight: .heavy))
                             .foregroundColor(Theme.background)
                             .frame(maxWidth: .infinity)
@@ -234,11 +329,11 @@ struct StartSheet: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Nouveau trajet")
+            .navigationTitle(tr("Nouveau trajet"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { presentation.wrappedValue.dismiss() }
+                    Button(tr("Annuler")) { presentation.wrappedValue.dismiss() }
                 }
             }
         }
@@ -249,8 +344,10 @@ struct StartSheet: View {
 struct EndStopSheet: View {
     @EnvironmentObject var t: TrackingManager
     @Environment(\.presentationMode) var presentation
+    @AppStorage("fuelUnit") private var fuelUnit = "l"
     @State private var place = ""
     @State private var kwh = ""
+    @State private var fuel = ""
     @State private var cost = ""
     @State private var network = ""
     @State private var startSoc = ""
@@ -259,10 +356,15 @@ struct EndStopSheet: View {
     @State private var pois: [Poi] = []
 
     private var isCharging: Bool { t.activeStop?.isCharging ?? false }
+    private var isRefuel: Bool { t.activeStop?.isRefuel ?? false }
+
+    private var placeholderPlace: String {
+        return t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city
+    }
 
     private var poiList: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("À proximité")
+            Text(tr("À proximité"))
                 .font(.caption)
                 .foregroundColor(Theme.textSecondary)
             ForEach(pois) { poi in
@@ -274,7 +376,7 @@ struct EndStopSheet: View {
                             Text(poi.name)
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(Theme.textPrimary)
-                            Text("\(poi.category) • \(Fmt.meters(poi.distance))")
+                            Text(tr(poi.category) + " • " + Fmt.meters(poi.distance))
                                 .font(.system(size: 11))
                                 .foregroundColor(Theme.textSecondary)
                         }
@@ -297,24 +399,35 @@ struct EndStopSheet: View {
                 Theme.background.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 14) {
-                        LabeledField(label: "Lieu", placeholder: t.city, text: $place)
+                        LabeledField(label: tr("Lieu"), placeholder: placeholderPlace, text: $place)
                         if !pois.isEmpty { poiList }
-                        LabeledField(label: "Coût ($)", placeholder: "0", text: $cost, keyboard: .decimalPad)
+                        LabeledField(label: tr("Coût ($)"), placeholder: tr("0"), text: $cost, keyboard: .decimalPad)
                         if isCharging {
-                            LabeledField(label: "Énergie (kWh)", placeholder: "0", text: $kwh, keyboard: .decimalPad)
-                            LabeledField(label: "Réseau", placeholder: "Tesla, IONNA, Electrify America…", text: $network)
-                            LabeledField(label: "Batterie début (%)", placeholder: "", text: $startSoc, keyboard: .numberPad)
-                            LabeledField(label: "Batterie fin (%)", placeholder: "", text: $endSoc, keyboard: .numberPad)
+                            LabeledField(label: tr("Énergie (kWh)"), placeholder: tr("0"), text: $kwh, keyboard: .decimalPad)
                         }
-                        LabeledField(label: "Notes", placeholder: "", text: $notes)
+                        if isRefuel {
+                            LabeledField(label: fuelUnit == "gal" ? tr("Volume (gallons)") : tr("Volume (litres)"),
+                                         placeholder: tr("0"), text: $fuel, keyboard: .decimalPad)
+                        }
+                        if isCharging || isRefuel {
+                            LabeledField(label: isRefuel ? tr("Station / fournisseur") : tr("Réseau"),
+                                         placeholder: isRefuel ? "Shell, Petro-Canada…" : "Tesla, IONNA, Electrify America…",
+                                         text: $network)
+                        }
+                        if isCharging {
+                            LabeledField(label: tr("Batterie début (%)"), placeholder: tr(""), text: $startSoc, keyboard: .numberPad)
+                            LabeledField(label: tr("Batterie fin (%)"), placeholder: tr(""), text: $endSoc, keyboard: .numberPad)
+                        }
+                        LabeledField(label: tr("Notes"), placeholder: tr(""), text: $notes)
                         Button {
                             t.finishStop(place: place.trimmingCharacters(in: .whitespaces),
                                          kwh: parseDouble(kwh), cost: parseDouble(cost),
                                          network: network, notes: notes,
-                                         startSoc: parseSoc(startSoc), endSoc: parseSoc(endSoc))
+                                         startSoc: parseSoc(startSoc), endSoc: parseSoc(endSoc),
+                                         fuelLiters: isRefuel ? Fmt.displayToLiters(parseDouble(fuel)) : nil)
                             presentation.wrappedValue.dismiss()
                         } label: {
-                            Text("Enregistrer l'arrêt")
+                            Text(tr("Enregistrer l'arrêt"))
                                 .font(.system(size: 17, weight: .heavy))
                                 .foregroundColor(Theme.background)
                                 .frame(maxWidth: .infinity)
@@ -330,11 +443,11 @@ struct EndStopSheet: View {
                 let c = t.currentCoordinate
                 PoiFinder.find(lat: c.0, lng: c.1, type: t.activeStop) { pois = $0 }
             }
-            .navigationTitle(t.activeStop?.label ?? "Arrêt")
+            .navigationTitle(t.activeStop?.label ?? tr("Arrêt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { presentation.wrappedValue.dismiss() }
+                    Button(tr("Annuler")) { presentation.wrappedValue.dismiss() }
                 }
             }
         }
@@ -345,6 +458,7 @@ struct EndStopSheet: View {
 struct EndTripSheet: View {
     @EnvironmentObject var t: TrackingManager
     @Environment(\.presentationMode) var presentation
+    @AppStorage("vehicle") private var vehicle = "ev"
     @State private var soc = ""
 
     var body: some View {
@@ -355,12 +469,14 @@ struct EndTripSheet: View {
                     Text("\(Fmt.km(t.distanceMeters)) • \(Fmt.human(t.tripSeconds))")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
-                    LabeledField(label: "Batterie à l'arrivée en % (optionnel)", placeholder: "ex. 35", text: $soc, keyboard: .numberPad)
+                    if vehicle != "ice" {
+                        LabeledField(label: tr("Batterie à l'arrivée en % (optionnel)"), placeholder: tr("ex. 35"), text: $soc, keyboard: .numberPad)
+                    }
                     Button {
                         t.endTrip(endSoc: parseSoc(soc))
                         presentation.wrappedValue.dismiss()
                     } label: {
-                        Text("Terminer et enregistrer")
+                        Text(tr("Terminer et enregistrer"))
                             .font(.system(size: 17, weight: .heavy))
                             .foregroundColor(Theme.background)
                             .frame(maxWidth: .infinity)
@@ -372,11 +488,11 @@ struct EndTripSheet: View {
                 }
                 .padding(16)
             }
-            .navigationTitle("Fin du trajet")
+            .navigationTitle(tr("Fin du trajet"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Annuler") { presentation.wrappedValue.dismiss() }
+                    Button(tr("Annuler")) { presentation.wrappedValue.dismiss() }
                 }
             }
         }

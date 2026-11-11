@@ -20,6 +20,8 @@ enum PoiFinder {
             queries = [("EV charging station", "Recharge"), ("Supercharger", "Recharge")]
         case .some(.chargingMeal):
             queries = [("EV charging station", "Recharge"), ("Restaurant", "Restaurant")]
+        case .some(.refuel):
+            queries = [("Station-service", "Essence"), ("Gas station", "Essence")]
         case .some(.meal):
             queries = [("Restaurant", "Restaurant"), ("Café", "Café")]
         default:

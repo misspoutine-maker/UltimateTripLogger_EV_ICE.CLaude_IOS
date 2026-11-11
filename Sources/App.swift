@@ -24,17 +24,19 @@ struct UltimateTripLoggerApp: App {
 
 struct RootView: View {
     @EnvironmentObject var tracker: TrackingManager
+    @AppStorage("lang") private var lang = "auto"
 
     var body: some View {
         TabView {
             LiveTripView()
-                .tabItem { Label("Trajet", systemImage: "speedometer") }
+                .tabItem { Label(tr("Trajet"), systemImage: "speedometer") }
             RecapView(store: tracker.store)
-                .tabItem { Label("Récap", systemImage: "chart.bar.fill") }
+                .tabItem { Label(tr("Récap"), systemImage: "chart.bar.fill") }
             HistoryView(store: tracker.store)
-                .tabItem { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                .tabItem { Label(tr("Historique"), systemImage: "clock.arrow.circlepath") }
         }
         .accentColor(Theme.blue)
+        .id(lang)
     }
 }
 

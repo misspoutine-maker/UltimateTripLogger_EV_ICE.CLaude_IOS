@@ -246,9 +246,9 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         if pendingHits >= 2 && sinceBorder >= 2500.0 {
             let title: String
             if countryChanged {
-                title = country.isEmpty ? "Poste frontalier" : "Douanes / Frontière : \(country)"
+                title = country.isEmpty ? tr("Poste frontalier") : tr("Douanes / Frontière :") + " \(country)"
             } else {
-                title = state.isEmpty ? "Passage frontière" : "Frontière État : \(state)"
+                title = state.isEmpty ? tr("Passage frontière") : tr("Frontière État :") + " \(state)"
             }
             let info = [state, country].filter { !$0.isEmpty }.joined(separator: ", ")
             let now = Date()
@@ -332,7 +332,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         guard !isTracking else { return }
         let now = Date()
         let hasCity = city != TrackingManager.placeholderCity
-        let startPlace = !place.isEmpty ? place : (hasCity ? city : "Départ")
+        let startPlace = !place.isEmpty ? place : (hasCity ? city : tr("Départ"))
         departureNeedsPlace = place.isEmpty && !hasCity
 
         var t = Trip()
@@ -430,7 +430,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
     }
 
     func finishStop(place: String, kwh: Double, cost: Double, network: String,
-                    notes: String, startSoc: Int?, endSoc: Int?) {
+                    notes: String, startSoc: Int?, endSoc: Int?, fuelLiters: Double? = nil) {
         guard let type = activeStop, let start = stopStart else { return }
         let now = Date()
         let duration = max(0, Int(now.timeIntervalSince(start)))
@@ -452,10 +452,11 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         stage.distanceSinceLastChargeMeters = max(0, distanceMeters - chargeAnchor)
         stage.startSoc = startSoc
         stage.endSoc = endSoc
+        stage.fuelLiters = fuelLiters
         trip?.stages.append(stage)
 
         stoppedBefore += duration
-        if type.isCharging { chargeAnchor = distanceMeters }
+        if type.isCharging || type.isRefuel { chargeAnchor = distanceMeters }
         stageAnchor = distanceMeters
         activeStop = nil
         stopStart = nil
@@ -475,7 +476,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         }
         let now = Date()
         var arrival = Stage(type: .arrival)
-        arrival.placeName = city == TrackingManager.placeholderCity ? "Arrivée" : city
+        arrival.placeName = city == TrackingManager.placeholderCity ? tr("Arrivée") : city
         arrival.address = address
         arrival.arrival = now
         arrival.departure = now
@@ -494,9 +495,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         t.endAddress = address
         t.endSoc = endSoc
         t.isOngoing = false
-        t.chargingSeconds = t.stages.filter { $0.type.isCharging }.reduce(0) { $0 + $1.durationSeconds }
-        t.mealSeconds = t.stages.filter { $0.type == .meal }.reduce(0) { $0 + $1.durationSeconds }
-        t.otherSeconds = t.stages.filter { $0.type == .other }.reduce(0) { $0 + $1.durationSeconds }
+        t.recomputeTimes()
         store.save(t)
 
         timer?.invalidate()

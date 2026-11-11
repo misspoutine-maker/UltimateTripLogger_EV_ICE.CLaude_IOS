@@ -39,15 +39,41 @@ enum Fmt {
         return f
     }()
 
-    private static let dayFormatter: DateFormatter = {
+    static func day(_ d: Date) -> String {
         let f = DateFormatter()
+        f.locale = Lang.locale
         f.dateStyle = .long
-        return f
-    }()
+        return f.string(from: d)
+    }
+
+    static var fuelUnitIsGallons: Bool {
+        return (UserDefaults.standard.string(forKey: "fuelUnit") ?? "l") == "gal"
+    }
+
+    static func fuel(_ liters: Double) -> String {
+        if fuelUnitIsGallons { return String(format: "%.1f gal", liters * 0.264172) }
+        return String(format: "%.1f L", liters)
+    }
+
+    static func displayToLiters(_ value: Double) -> Double {
+        return fuelUnitIsGallons ? value / 0.264172 : value
+    }
+
+    static func litersToDisplay(_ liters: Double) -> Double {
+        return fuelUnitIsGallons ? liters * 0.264172 : liters
+    }
+
+    static func consumption(liters: Double, meters: Double) -> String {
+        if liters <= 0 || meters <= 0 { return "–" }
+        if fuelUnitIsGallons {
+            let mpg = (meters / 1609.344) / (liters * 0.264172)
+            return String(format: "%.1f mpg", mpg)
+        }
+        return String(format: "%.1f L/100 km", liters / (meters / 1000.0) * 100.0)
+    }
 
     static func dateTime(_ d: Date) -> String { dtFormatter.string(from: d) }
     static func time(_ d: Date) -> String { timeFormatter.string(from: d) }
-    static func day(_ d: Date) -> String { dayFormatter.string(from: d) }
 }
 
 enum Theme {
@@ -59,6 +85,7 @@ enum Theme {
     static let green = Color(hex: 0x00E676)
     static let amber = Color(hex: 0xFFB703)
     static let purple = Color(hex: 0xBD66FF)
+    static let orange = Color(hex: 0xFF7A00)
     static let gold = Color(hex: 0xFFD166)
     static let red = Color(hex: 0xFF4B5C)
     static let textPrimary = Color(hex: 0xF2F6FA)
@@ -68,6 +95,7 @@ enum Theme {
         switch type {
         case .departure: return blue
         case .charging: return green
+        case .refuel: return orange
         case .meal: return amber
         case .chargingMeal: return green
         case .other: return purple

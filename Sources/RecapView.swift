@@ -10,13 +10,14 @@ struct DayRecap: Identifiable {
     var meal: Int { trips.reduce(0) { $0 + $1.mealSeconds } }
     var kwh: Double { trips.flatMap { $0.stages }.reduce(0) { $0 + $1.energyKwh } }
     var cost: Double { trips.flatMap { $0.stages }.reduce(0) { $0 + $1.cost } }
-    var chargeCount: Int { trips.flatMap { $0.stages }.filter { $0.type.isCharging }.count }
+    var chargeCount: Int { trips.flatMap { $0.stages }.filter { $0.type.isCharging || $0.type.isRefuel }.count }
     var maxSpeed: Double { trips.map { $0.maxSpeedKmh }.max() ?? 0 }
     var avgSpeed: Double {
         let h = Double(driving) / 3600.0
         return h > 0 ? (distance / 1000.0) / h : 0
     }
     var gain: Double { trips.reduce(0) { $0 + $1.elevationGainMeters } }
+    var fuelLiters: Double { trips.reduce(0) { $0 + $1.totalFuelLiters } }
     var kwhPer100: Double { distance > 0 ? kwh / (distance / 1000.0) * 100.0 : 0 }
 }
 
@@ -36,7 +37,7 @@ struct RecapView: View {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 if days.isEmpty {
-                    Text("Aucun récap disponible")
+                    Text(tr("Aucun récap disponible"))
                         .foregroundColor(Theme.textSecondary)
                 } else {
                     ScrollView {
@@ -53,7 +54,7 @@ struct RecapView: View {
                     }
                 }
             }
-            .navigationTitle("Récap")
+            .navigationTitle(tr("Récap"))
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
@@ -61,19 +62,25 @@ struct RecapView: View {
     private var totalsCard: some View {
         let all = DayRecap(id: Date(), trips: days.flatMap { $0.trips })
         return VStack(spacing: 8) {
-            Text("Total • \(days.count) jour(s)")
+            Text(tr("Total •") + " \(days.count) " + tr("jour(s)"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(Theme.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 8) {
-                MetricCard(label: "Distance", value: Fmt.km(all.distance))
-                MetricCard(label: "Conduite", value: Fmt.human(all.driving))
-                MetricCard(label: "Énergie", value: String(format: "%.0f kWh", all.kwh))
+                MetricCard(label: tr("Distance"), value: Fmt.km(all.distance))
+                MetricCard(label: tr("Conduite"), value: Fmt.human(all.driving))
+                MetricCard(label: tr("Énergie"), value: String(format: "%.0f kWh", all.kwh))
             }
             HStack(spacing: 8) {
-                MetricCard(label: "Coût total", value: String(format: "%.2f $", all.cost))
-                MetricCard(label: "kWh/100 km", value: String(format: "%.1f", all.kwhPer100))
-                MetricCard(label: "Recharges", value: "\(all.chargeCount)")
+                MetricCard(label: tr("Coût total"), value: String(format: "%.2f $", all.cost))
+                MetricCard(label: tr("kWh/100 km"), value: String(format: "%.1f", all.kwhPer100))
+                MetricCard(label: tr("Recharges"), value: "\(all.chargeCount)")
+            }
+            if all.fuelLiters > 0 {
+                HStack(spacing: 8) {
+                    MetricCard(label: tr("Carburant"), value: Fmt.fuel(all.fuelLiters))
+                    MetricCard(label: tr("Conso"), value: Fmt.consumption(liters: all.fuelLiters, meters: all.distance))
+                }
             }
         }
     }
@@ -89,7 +96,7 @@ struct DayCard: View {
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
-                Text("\(day.trips.count) trajet(s)")
+                Text("\(day.trips.count) " + tr("trajet(s)"))
                     .font(.system(size: 12))
                     .foregroundColor(Theme.textSecondary)
             }
@@ -123,19 +130,25 @@ struct DayDetailView: View {
             ScrollView {
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
-                        MetricCard(label: "Distance", value: Fmt.km(day.distance))
-                        MetricCard(label: "Conduite", value: Fmt.human(day.driving))
-                        MetricCard(label: "Vitesse moy.", value: Fmt.speed(day.avgSpeed))
+                        MetricCard(label: tr("Distance"), value: Fmt.km(day.distance))
+                        MetricCard(label: tr("Conduite"), value: Fmt.human(day.driving))
+                        MetricCard(label: tr("Vitesse moy."), value: Fmt.speed(day.avgSpeed))
                     }
                     HStack(spacing: 8) {
-                        MetricCard(label: "Vitesse max", value: Fmt.speed(day.maxSpeed))
-                        MetricCard(label: "Recharge", value: Fmt.human(day.charging))
-                        MetricCard(label: "Repas", value: Fmt.human(day.meal))
+                        MetricCard(label: tr("Vitesse max"), value: Fmt.speed(day.maxSpeed))
+                        MetricCard(label: tr("Recharge"), value: Fmt.human(day.charging))
+                        MetricCard(label: tr("Repas"), value: Fmt.human(day.meal))
                     }
                     HStack(spacing: 8) {
-                        MetricCard(label: "Énergie", value: String(format: "%.1f kWh", day.kwh))
-                        MetricCard(label: "Coût", value: String(format: "%.2f $", day.cost))
-                        MetricCard(label: "Dénivelé +", value: Fmt.meters(day.gain))
+                        MetricCard(label: tr("Énergie"), value: String(format: "%.1f kWh", day.kwh))
+                        MetricCard(label: tr("Coût"), value: String(format: "%.2f $", day.cost))
+                        MetricCard(label: tr("Dénivelé +"), value: Fmt.meters(day.gain))
+                    }
+                    if day.fuelLiters > 0 {
+                        HStack(spacing: 8) {
+                            MetricCard(label: tr("Carburant"), value: Fmt.fuel(day.fuelLiters))
+                            MetricCard(label: tr("Conso"), value: Fmt.consumption(liters: day.fuelLiters, meters: day.distance))
+                        }
                     }
                     ForEach(day.trips) { trip in
                         NavigationLink(destination: TripDetailView(store: store, tripId: trip.id)) {
@@ -152,10 +165,10 @@ struct DayDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button("Exporter en PDF") {
+                    Button(tr("Exporter en PDF")) {
                         if let url = PdfExporter.dayPDF(day) { share = ShareItem(url: url) }
                     }
-                    Button("Copier pour Google Sheets") {
+                    Button(tr("Copier pour Google Sheets")) {
                         SheetsExport.copy(day.trips)
                         copied = true
                     }

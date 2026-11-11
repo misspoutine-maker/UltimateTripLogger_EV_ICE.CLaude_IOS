@@ -55,6 +55,14 @@ final class TripStore: ObservableObject {
         }
     }
 
+    func mutate(_ tripId: UUID, _ change: (inout Trip) -> Void) {
+        guard let i = trips.firstIndex(where: { $0.id == tripId }) else { return }
+        var t = trips[i]
+        change(&t)
+        t.recomputeTimes()
+        save(t)
+    }
+
     func delete(_ trip: Trip) {
         try? FileManager.default.removeItem(at: fileURL(trip.id))
         trips.removeAll { $0.id == trip.id }
@@ -90,8 +98,8 @@ enum CsvExporter {
         var lines: [String] = []
         let header = ["Type", "Lieu", "Adresse", "Arrivée", "Départ", "Durée (min)",
                       "Distance depuis précédent (km)", "Depuis dernière recharge (km)",
-                      "kWh", "Coût", "Réseau", "SOC début (%)", "SOC fin (%)", "Notes"]
-        lines.append(header.map { esc($0) }.joined(separator: ","))
+                      "kWh", "Carburant (L)", "Coût", "Réseau", "SOC début (%)", "SOC fin (%)", "Notes"]
+        lines.append(header.map { esc(tr($0)) }.joined(separator: ","))
         for s in trip.stages {
             let cols: [String] = [
                 esc(s.type.label), esc(s.placeName), esc(s.address),
@@ -99,7 +107,7 @@ enum CsvExporter {
                 num(Double(s.durationSeconds) / 60.0, 0),
                 num(s.distanceFromPrevMeters / 1000.0),
                 num(s.distanceSinceLastChargeMeters / 1000.0),
-                num(s.energyKwh), num(s.cost, 2), esc(s.network),
+                num(s.energyKwh), num(s.fuelLiters ?? 0), num(s.cost, 2), esc(s.network),
                 soc(s.startSoc), soc(s.endSoc), esc(s.notes)
             ]
             lines.append(cols.joined(separator: ","))
@@ -114,7 +122,7 @@ enum CsvExporter {
         let header = ["Date", "Départ", "Arrivée", "Distance (km)", "Durée conduite (min)",
                       "Recharge (min)", "Repas (min)", "Autre (min)", "Vitesse moy. (km/h)",
                       "Vitesse max (km/h)", "Dénivelé + (m)", "SOC départ (%)", "SOC arrivée (%)"]
-        lines.append(header.map { esc($0) }.joined(separator: ","))
+        lines.append(header.map { esc(tr($0)) }.joined(separator: ","))
         for t in trips where !t.isOngoing {
             let cols: [String] = [
                 esc(Fmt.dateTime(t.startTime)), esc(t.startPlace), esc(t.endPlace),
