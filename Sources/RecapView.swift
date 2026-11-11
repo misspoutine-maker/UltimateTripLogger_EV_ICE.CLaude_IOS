@@ -17,6 +17,7 @@ struct DayRecap: Identifiable {
         return h > 0 ? (distance / 1000.0) / h : 0
     }
     var gain: Double { trips.reduce(0) { $0 + $1.elevationGainMeters } }
+    var kwhPer100: Double { distance > 0 ? kwh / (distance / 1000.0) * 100.0 : 0 }
 }
 
 struct RecapView: View {
@@ -69,6 +70,11 @@ struct RecapView: View {
                 MetricCard(label: "Conduite", value: Fmt.human(all.driving))
                 MetricCard(label: "Énergie", value: String(format: "%.0f kWh", all.kwh))
             }
+            HStack(spacing: 8) {
+                MetricCard(label: "Coût total", value: String(format: "%.2f $", all.cost))
+                MetricCard(label: "kWh/100 km", value: String(format: "%.1f", all.kwhPer100))
+                MetricCard(label: "Recharges", value: "\(all.chargeCount)")
+            }
         }
     }
 }
@@ -108,6 +114,8 @@ struct DayCard: View {
 struct DayDetailView: View {
     @ObservedObject var store: TripStore
     let day: DayRecap
+    @State private var share: ShareItem?
+    @State private var copied = false
 
     var body: some View {
         ZStack {
@@ -141,5 +149,22 @@ struct DayDetailView: View {
         }
         .navigationTitle(Fmt.day(day.id))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Exporter en PDF") {
+                        if let url = PdfExporter.dayPDF(day) { share = ShareItem(url: url) }
+                    }
+                    Button("Copier pour Google Sheets") {
+                        SheetsExport.copy(day.trips)
+                        copied = true
+                    }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .sheet(item: $share) { item in ShareSheet(url: item.url) }
+        .alert(isPresented: $copied) { copiedAlert }
     }
 }

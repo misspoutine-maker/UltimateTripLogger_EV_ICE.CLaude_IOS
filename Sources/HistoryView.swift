@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoryView: View {
     @ObservedObject var store: TripStore
     @State private var share: ShareItem?
+    @State private var copied = false
 
     var body: some View {
         NavigationView {
@@ -28,8 +29,14 @@ struct HistoryView: View {
             .navigationTitle("Historique")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        if let url = CsvExporter.allTripsCSV(store.trips) { share = ShareItem(url: url) }
+                    Menu {
+                        Button("Exporter tout en CSV") {
+                            if let url = CsvExporter.allTripsCSV(store.trips) { share = ShareItem(url: url) }
+                        }
+                        Button("Copier pour Google Sheets") {
+                            SheetsExport.copy(store.trips)
+                            copied = true
+                        }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                     }
@@ -39,8 +46,13 @@ struct HistoryView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(item: $share) { item in ShareSheet(url: item.url) }
+        .alert(isPresented: $copied) { copiedAlert }
     }
 }
+
+let copiedAlert = Alert(title: Text("Copié"),
+                        message: Text("Ouvre Google Sheets, appui long sur une cellule → Coller."),
+                        dismissButton: .default(Text("OK")))
 
 struct TripRow: View {
     let trip: Trip

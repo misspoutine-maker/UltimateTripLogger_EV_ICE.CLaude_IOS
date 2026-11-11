@@ -64,6 +64,8 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         authStatus = lm.authorizationStatus
     }
 
+    var currentCoordinate: (Double, Double) { return (lastLat, lastLng) }
+
     // MARK: Permissions et GPS
 
     func startGPS() {

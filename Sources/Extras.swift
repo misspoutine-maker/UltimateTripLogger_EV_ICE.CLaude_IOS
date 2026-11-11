@@ -106,11 +106,42 @@ enum PdfExporter {
             lines.append((d, false))
         }
 
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd_HHmm"
+        return render(lines, name: "Trajet_\(df.string(from: trip.startTime)).pdf")
+    }
+
+    static func dayPDF(_ day: DayRecap) -> URL? {
+        var lines: [(String, Bool)] = []
+        lines.append(("Récap du \(Fmt.day(day.id))", true))
+        lines.append(("", false))
+        lines.append(("Trajets : \(day.trips.count)   Distance : \(Fmt.km(day.distance))   Conduite : \(Fmt.human(day.driving))", false))
+        lines.append(("Vitesse moy. : \(Fmt.speed(day.avgSpeed))   max : \(Fmt.speed(day.maxSpeed))   Dénivelé + : \(Fmt.meters(day.gain))", false))
+        lines.append((String(format: "Énergie : %.1f kWh   Coût : %.2f $   Recharges : %d", day.kwh, day.cost, day.chargeCount), false))
+        lines.append(("Recharge : \(Fmt.human(day.charging))   Repas : \(Fmt.human(day.meal))", false))
+        for trip in day.trips {
+            lines.append(("", false))
+            lines.append(("\(trip.startPlace) → \(trip.endPlace.isEmpty ? "…" : trip.endPlace)", true))
+            lines.append(("\(Fmt.time(trip.startTime))  •  \(Fmt.km(trip.totalDistanceMeters))  •  \(Fmt.human(trip.drivingSeconds))", false))
+            for s in trip.stages where s.type != .departure && s.type != .arrival {
+                var l = "      \(Fmt.time(s.arrival))  \(s.type.label)"
+                if !s.placeName.isEmpty { l += " – \(s.placeName)" }
+                if s.durationSeconds > 0 { l += " (\(Fmt.human(s.durationSeconds)))" }
+                if s.energyKwh > 0 { l += String(format: " • %.1f kWh", s.energyKwh) }
+                if s.cost > 0 { l += String(format: " • %.2f $", s.cost) }
+                lines.append((l, false))
+            }
+        }
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return render(lines, name: "Recap_\(df.string(from: day.id)).pdf")
+    }
+
+    private static func render(_ lines: [(String, Bool)], name: String) -> URL? {
         let pageRect = CGRect(x: 0, y: 0, width: 595, height: 842)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
         let normal: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 11)]
         let bold: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 15)]
-
         let data = renderer.pdfData { ctx in
             ctx.beginPage()
             var y: CGFloat = 40
@@ -123,15 +154,47 @@ enum PdfExporter {
                 y += isBold ? 24 : 16
             }
         }
-
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd_HHmm"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Trajet_\(df.string(from: trip.startTime)).pdf")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         do {
             try data.write(to: url)
             return url
         } catch {
             return nil
         }
+    }
+}
+
+enum SheetsExport {
+    private static func clean(_ s: String) -> String {
+        return s.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ")
+    }
+
+    // Texte tabulé : se colle directement dans Google Sheets
+    static func tsv(_ trips: [Trip]) -> String {
+        let header = ["Date", "Départ", "Arrivée", "Type", "Lieu", "Arrivée à", "Durée (min)",
+                      "Distance étape (km)", "Depuis recharge (km)", "kWh", "Coût", "Réseau",
+                      "SOC début", "SOC fin", "Notes"]
+        var rows: [String] = [header.joined(separator: "\t")]
+        let us = Locale(identifier: "en_US")
+        for t in trips.sorted(by: { $0.startTime < $1.startTime }) where !t.isOngoing {
+            for s in t.stages {
+                let cols: [String] = [
+                    Fmt.dateTime(t.startTime), clean(t.startPlace), clean(t.endPlace),
+                    s.type.label, clean(s.placeName), Fmt.dateTime(s.arrival),
+                    String(format: "%.0f", locale: us, Double(s.durationSeconds) / 60.0),
+                    String(format: "%.1f", locale: us, s.distanceFromPrevMeters / 1000.0),
+                    String(format: "%.1f", locale: us, s.distanceSinceLastChargeMeters / 1000.0),
+                    String(format: "%.1f", locale: us, s.energyKwh),
+                    String(format: "%.2f", locale: us, s.cost), clean(s.network),
+                    s.startSoc.map { "\($0)" } ?? "", s.endSoc.map { "\($0)" } ?? "", clean(s.notes)
+                ]
+                rows.append(cols.joined(separator: "\t"))
+            }
+        }
+        return rows.joined(separator: "\n")
+    }
+
+    static func copy(_ trips: [Trip]) {
+        UIPasteboard.general.string = tsv(trips)
     }
 }

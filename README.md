@@ -1,6 +1,6 @@
-# Ultimate Trip Logger (iOS) — phases 1-3 (v3.0)
+# Ultimate Trip Logger (iOS) — phases 1-4 (v4.0)
 
-SwiftUI, iOS 15+ (iPhone 8). Suivi GPS, arrêts (recharge/repas/autre), frontières, historique, carte du parcours, récap quotidien, profil d'altitude, export CSV et PDF.
+SwiftUI, iOS 15+ (iPhone 8). Suivi GPS, arrêts (recharge/repas/autre), frontières, historique, carte du parcours, récap quotidien, profil d'altitude, lieux à proximité aux arrêts, export CSV, PDF et Google Sheets.
 
 ## Compiler avec Codemagic
 1. Mets ce dossier dans un dépôt Git (GitHub) et connecte-le à Codemagic.

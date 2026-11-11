@@ -256,8 +256,40 @@ struct EndStopSheet: View {
     @State private var startSoc = ""
     @State private var endSoc = ""
     @State private var notes = ""
+    @State private var pois: [Poi] = []
 
     private var isCharging: Bool { t.activeStop?.isCharging ?? false }
+
+    private var poiList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("À proximité")
+                .font(.caption)
+                .foregroundColor(Theme.textSecondary)
+            ForEach(pois) { poi in
+                Button {
+                    place = poi.name
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(poi.name)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(Theme.textPrimary)
+                            Text("\(poi.category) • \(Fmt.meters(poi.distance))")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if place == poi.name {
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(Theme.green)
+                        }
+                    }
+                    .padding(10)
+                    .background(Theme.surface)
+                    .cornerRadius(10)
+                }
+            }
+        }
+    }
 
     var body: some View {
         NavigationView {
@@ -266,9 +298,10 @@ struct EndStopSheet: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         LabeledField(label: "Lieu", placeholder: t.city, text: $place)
+                        if !pois.isEmpty { poiList }
+                        LabeledField(label: "Coût ($)", placeholder: "0", text: $cost, keyboard: .decimalPad)
                         if isCharging {
                             LabeledField(label: "Énergie (kWh)", placeholder: "0", text: $kwh, keyboard: .decimalPad)
-                            LabeledField(label: "Coût ($)", placeholder: "0", text: $cost, keyboard: .decimalPad)
                             LabeledField(label: "Réseau", placeholder: "Tesla, IONNA, Electrify America…", text: $network)
                             LabeledField(label: "Batterie début (%)", placeholder: "", text: $startSoc, keyboard: .numberPad)
                             LabeledField(label: "Batterie fin (%)", placeholder: "", text: $endSoc, keyboard: .numberPad)
@@ -292,6 +325,10 @@ struct EndStopSheet: View {
                     }
                     .padding(16)
                 }
+            }
+            .onAppear {
+                let c = t.currentCoordinate
+                PoiFinder.find(lat: c.0, lng: c.1, type: t.activeStop) { pois = $0 }
             }
             .navigationTitle(t.activeStop?.label ?? "Arrêt")
             .navigationBarTitleDisplayMode(.inline)
