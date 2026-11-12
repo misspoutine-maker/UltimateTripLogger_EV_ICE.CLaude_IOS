@@ -99,15 +99,15 @@ enum CsvExporter {
         let header = ["Type", "Lieu", "Adresse", "Arrivée", "Départ", "Durée (min)",
                       "Distance depuis précédent (km)", "Depuis dernière recharge (km)",
                       "kWh", "Carburant (L)", "Coût", "Réseau", "SOC début (%)", "SOC fin (%)", "Notes"]
-        lines.append(header.map { esc(tr($0)) }.joined(separator: ","))
+        lines.append(header.map { esc(Fmt.unitize(tr($0))) }.joined(separator: ","))
         for s in trip.stages {
             let cols: [String] = [
                 esc(s.type.label), esc(s.placeName), esc(s.address),
                 esc(Fmt.dateTime(s.arrival)), esc(Fmt.dateTime(s.departure)),
                 num(Double(s.durationSeconds) / 60.0, 0),
-                num(s.distanceFromPrevMeters / 1000.0),
-                num(s.distanceSinceLastChargeMeters / 1000.0),
-                num(s.energyKwh), num(s.fuelLiters ?? 0), num(s.cost, 2), esc(s.network),
+                num(Fmt.dist(s.distanceFromPrevMeters / 1000.0)),
+                num(Fmt.dist(s.distanceSinceLastChargeMeters / 1000.0)),
+                num(s.energyKwh), num(Fmt.vol(s.fuelLiters ?? 0)), num(s.cost, 2), esc(s.network),
                 soc(s.startSoc), soc(s.endSoc), esc(s.notes)
             ]
             lines.append(cols.joined(separator: ","))
@@ -122,16 +122,16 @@ enum CsvExporter {
         let header = ["Date", "Départ", "Arrivée", "Distance (km)", "Durée conduite (min)",
                       "Recharge (min)", "Repas (min)", "Autre (min)", "Vitesse moy. (km/h)",
                       "Vitesse max (km/h)", "Dénivelé + (m)", "SOC départ (%)", "SOC arrivée (%)"]
-        lines.append(header.map { esc(tr($0)) }.joined(separator: ","))
+        lines.append(header.map { esc(Fmt.unitize(tr($0))) }.joined(separator: ","))
         for t in trips where !t.isOngoing {
             let cols: [String] = [
                 esc(Fmt.dateTime(t.startTime)), esc(t.startPlace), esc(t.endPlace),
-                num(t.totalDistanceMeters / 1000.0),
+                num(Fmt.dist(t.totalDistanceMeters / 1000.0)),
                 num(Double(t.drivingSeconds) / 60.0, 0),
                 num(Double(t.chargingSeconds) / 60.0, 0),
                 num(Double(t.mealSeconds) / 60.0, 0),
                 num(Double(t.otherSeconds) / 60.0, 0),
-                num(t.avgSpeedKmh), num(t.maxSpeedKmh), num(t.elevationGainMeters, 0),
+                num(Fmt.spd(t.avgSpeedKmh)), num(Fmt.spd(t.maxSpeedKmh)), num(Fmt.elev(t.elevationGainMeters), 0),
                 soc(t.startSoc), soc(t.endSoc)
             ]
             lines.append(cols.joined(separator: ","))

@@ -26,6 +26,8 @@ struct UltimateTripLoggerApp: App {
 struct RootView: View {
     @EnvironmentObject var tracker: TrackingManager
     @AppStorage("lang") private var lang = "auto"
+    @AppStorage("units") private var units = "metric"
+    @AppStorage("vehicle") private var vehicle = "ev"
 
     var body: some View {
         TabView {
@@ -36,14 +38,28 @@ struct RootView: View {
             HistoryView(store: tracker.store)
                 .tabItem { Label(tr("Historique"), systemImage: "clock.arrow.circlepath") }
         }
-        .accentColor(Theme.blue)
-        .id(lang)
+        .accentColor(Theme.mode(vehicle))
+        .id(lang + units)
     }
 }
 
 struct ShareItem: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+struct ModeBadge: View {
+    let mode: String?
+
+    var body: some View {
+        Text(Fmt.modeLabel(mode))
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(Theme.background)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Theme.mode(mode))
+            .cornerRadius(6)
+    }
 }
 
 struct MailItem: Identifiable {

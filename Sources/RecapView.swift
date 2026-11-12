@@ -18,7 +18,10 @@ struct DayRecap: Identifiable {
     }
     var gain: Double { trips.reduce(0) { $0 + $1.elevationGainMeters } }
     var fuelLiters: Double { trips.reduce(0) { $0 + $1.totalFuelLiters } }
-    var kwhPer100: Double { distance > 0 ? kwh / (distance / 1000.0) * 100.0 : 0 }
+    var kwhPer100: Double {
+        let d = Fmt.isImperial ? distance / 1609.344 : distance / 1000.0
+        return d > 0 ? kwh / d * 100.0 : 0
+    }
 }
 
 extension DayRecap {
@@ -91,7 +94,7 @@ struct RecapView: View {
             }
             HStack(spacing: 8) {
                 MetricCard(label: tr("Coût total"), value: String(format: "%.2f $", all.cost))
-                MetricCard(label: tr("kWh/100 km"), value: String(format: "%.1f", all.kwhPer100))
+                MetricCard(label: Fmt.isImperial ? "kWh/100 mi" : "kWh/100 km", value: String(format: "%.1f", all.kwhPer100))
                 MetricCard(label: tr("Recharges"), value: "\(all.chargeCount)")
             }
             if all.fuelLiters > 0 {
@@ -172,6 +175,18 @@ struct DayDetailView: View {
                             TripRow(trip: trip)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .contextMenu {
+                            Button(tr("Exporter pour Google Sheets (.xlsx)")) {
+                                if let url = XlsxExporter.workbook(trips: [trip], name: "Trajet.xlsx") {
+                                    share = ShareItem(url: url)
+                                }
+                            }
+                            Button(tr("Exporter en PDF (avec carte)")) {
+                                PdfExporter.tripPDF(trip) { url in
+                                    if let url = url { share = ShareItem(url: url) }
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(16)

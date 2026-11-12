@@ -344,6 +344,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         t.startLng = lastLng
         t.startSoc = soc
         t.isOngoing = true
+        t.vehicleMode = UserDefaults.standard.string(forKey: "vehicle") ?? "ev"
 
         var dep = Stage(type: .departure)
         dep.placeName = startPlace

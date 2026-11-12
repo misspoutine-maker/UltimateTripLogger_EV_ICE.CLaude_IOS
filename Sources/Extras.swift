@@ -37,7 +37,7 @@ struct AltitudeProfileView: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
-                Text("\(Int(lo)) m – \(Int(hi)) m")
+                Text(Fmt.meters(lo) + " – " + Fmt.meters(hi))
                     .font(.system(size: 12))
                     .foregroundColor(Theme.blue)
             }
@@ -373,17 +373,17 @@ enum XlsxExporter {
             var row: [XCell] = []
             row.append(.text(dayFmt.string(from: d.id)))
             row.append(n(Double(d.trips.count), 0))
-            row.append(n(d.distance / 1000.0))
+            row.append(n(Fmt.dist(d.distance / 1000.0)))
             row.append(n(Double(d.driving) / 60.0, 0))
             row.append(n(Double(d.charging) / 60.0, 0))
             row.append(n(Double(d.meal) / 60.0, 0))
             row.append(n(d.kwh))
-            row.append(n(d.fuelLiters))
+            row.append(n(Fmt.vol(d.fuelLiters)))
             row.append(n(d.cost, 2))
             row.append(n(Double(d.chargeCount), 0))
-            row.append(n(d.avgSpeed))
-            row.append(n(d.maxSpeed))
-            row.append(n(d.gain, 0))
+            row.append(n(Fmt.spd(d.avgSpeed)))
+            row.append(n(Fmt.spd(d.maxSpeed)))
+            row.append(n(Fmt.elev(d.gain), 0))
             daily.append(row)
         }
 
@@ -392,25 +392,26 @@ enum XlsxExporter {
         tripRows.append(headerRow(["Date", "Départ", "Arrivée", "Distance (km)", "Conduite (min)",
                                    "Recharge (min)", "Repas (min)", "Autre (min)", "Vitesse moy. (km/h)",
                                    "Vitesse max (km/h)", "Dénivelé + (m)", "SOC départ (%)",
-                                   "SOC arrivée (%)", "Énergie (kWh)", "Carburant (L)", "Coût"]))
+                                   "SOC arrivée (%)", "Énergie (kWh)", "Carburant (L)", "Coût", "Mode"]))
         for t in done {
             var row: [XCell] = []
             row.append(.text(Fmt.dateTime(t.startTime)))
             row.append(.text(t.startPlace))
             row.append(.text(t.endPlace))
-            row.append(n(t.totalDistanceMeters / 1000.0))
+            row.append(n(Fmt.dist(t.totalDistanceMeters / 1000.0)))
             row.append(n(Double(t.drivingSeconds) / 60.0, 0))
             row.append(n(Double(t.chargingSeconds) / 60.0, 0))
             row.append(n(Double(t.mealSeconds) / 60.0, 0))
             row.append(n(Double(t.otherSeconds) / 60.0, 0))
-            row.append(n(t.avgSpeedKmh))
-            row.append(n(t.maxSpeedKmh))
-            row.append(n(t.elevationGainMeters, 0))
+            row.append(n(Fmt.spd(t.avgSpeedKmh)))
+            row.append(n(Fmt.spd(t.maxSpeedKmh)))
+            row.append(n(Fmt.elev(t.elevationGainMeters), 0))
             row.append(soc(t.startSoc))
             row.append(soc(t.endSoc))
             row.append(n(t.totalKwh))
-            row.append(n(t.totalFuelLiters))
+            row.append(n(Fmt.vol(t.totalFuelLiters)))
             row.append(n(t.totalCost, 2))
+            row.append(.text(Fmt.modeLabel(t.vehicleMode)))
             tripRows.append(row)
         }
 
@@ -428,10 +429,10 @@ enum XlsxExporter {
                 row.append(.text(s.placeName))
                 row.append(.text(Fmt.dateTime(s.arrival)))
                 row.append(n(Double(s.durationSeconds) / 60.0, 0))
-                row.append(n(s.distanceFromPrevMeters / 1000.0))
-                row.append(n(s.distanceSinceLastChargeMeters / 1000.0))
+                row.append(n(Fmt.dist(s.distanceFromPrevMeters / 1000.0)))
+                row.append(n(Fmt.dist(s.distanceSinceLastChargeMeters / 1000.0)))
                 row.append(n(s.energyKwh))
-                row.append(n(s.fuelLiters ?? 0))
+                row.append(n(Fmt.vol(s.fuelLiters ?? 0)))
                 row.append(n(s.cost, 2))
                 row.append(.text(s.network))
                 row.append(soc(s.startSoc))
@@ -453,7 +454,7 @@ enum XlsxExporter {
     }
 
     private static func headerRow(_ titles: [String]) -> [XCell] {
-        return titles.map { XCell.text("#H#" + tr($0)) }
+        return titles.map { XCell.text("#H#" + Fmt.unitize(tr($0))) }
     }
 
     private static func esc(_ s: String) -> String {

@@ -23,11 +23,32 @@ struct HistoryView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
+                            Text(tr("Appui long sur un trajet pour l'exporter"))
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             ForEach(store.trips) { trip in
                                 NavigationLink(destination: TripDetailView(store: store, tripId: trip.id)) {
                                     TripRow(trip: trip)
                                 }
                                 .buttonStyle(PlainButtonStyle())
+                                .contextMenu {
+                                    if !trip.isOngoing {
+                                        Button(tr("Exporter pour Google Sheets (.xlsx)")) {
+                                            if let url = XlsxExporter.workbook(trips: [trip], name: "Trajet.xlsx") {
+                                                share = ShareItem(url: url)
+                                            }
+                                        }
+                                        Button(tr("Exporter en PDF (avec carte)")) {
+                                            PdfExporter.tripPDF(trip) { url in
+                                                if let url = url { share = ShareItem(url: url) }
+                                            }
+                                        }
+                                        Button(tr("Envoyer le CSV par e-mail")) {
+                                            if let url = CsvExporter.tripCSV(trip) { sendMail(url) }
+                                        }
+                                    }
+                                }
                             }
                         }
                         .padding(16)
@@ -68,6 +89,7 @@ struct TripRow: View {
                 Text(Fmt.day(trip.startTime))
                     .font(.system(size: 13))
                     .foregroundColor(Theme.textSecondary)
+                ModeBadge(mode: trip.vehicleMode)
                 Spacer()
                 if trip.isOngoing {
                     Text(tr("● En cours"))
@@ -90,7 +112,7 @@ struct TripRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.mode(trip.vehicleMode).opacity(0.6), lineWidth: 1.5))
     }
 
     private var route: String {
@@ -129,6 +151,39 @@ struct TripDetailView: View {
 
     private var trip: Trip? { store.trips.first { $0.id == tripId } }
 
+    private func exportSheet(_ trip: Trip) {
+        if let url = XlsxExporter.workbook(trips: [trip], name: "Trajet.xlsx") {
+            sheet = .share(ShareItem(url: url))
+        }
+    }
+
+    private func exportPDF(_ trip: Trip) {
+        PdfExporter.tripPDF(trip) { url in
+            if let url = url { sheet = .share(ShareItem(url: url)) }
+        }
+    }
+
+    private func exportCSV(_ trip: Trip) {
+        guard let url = CsvExporter.tripCSV(trip) else { return }
+        let next: DetailSheet = MailComposer.canSend
+            ? .mail(MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger")))
+            : .share(ShareItem(url: url))
+        sheet = next
+    }
+
+    private func exportButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                Text(tr(title)).font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundColor(Theme.blue)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.blue.opacity(0.5), lineWidth: 1))
+        }
+    }
+
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
@@ -157,6 +212,11 @@ struct TripDetailView: View {
                                 StageRow(stage: stage)
                             }
                             .buttonStyle(PlainButtonStyle())
+                        }
+                        if !trip.isOngoing {
+                            exportButton("Exporter pour Google Sheets (.xlsx)", icon: "tablecells") { exportSheet(trip) }
+                            exportButton("Exporter en PDF (avec carte)", icon: "doc.richtext") { exportPDF(trip) }
+                            exportButton("Envoyer le CSV par e-mail", icon: "envelope") { exportCSV(trip) }
                         }
                         Button {
                             confirmDelete = true
@@ -231,9 +291,12 @@ struct TripDetailView: View {
             Text("\(trip.startPlace) → \(trip.endPlace.isEmpty ? "…" : trip.endPlace)")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(Theme.textPrimary)
-            Text(Fmt.dateTime(trip.startTime))
-                .font(.system(size: 13))
-                .foregroundColor(Theme.textSecondary)
+            HStack(spacing: 8) {
+                Text(Fmt.dateTime(trip.startTime))
+                    .font(.system(size: 13))
+                    .foregroundColor(Theme.textSecondary)
+                ModeBadge(mode: trip.vehicleMode)
+            }
             if !trip.isOngoing {
                 Text(tr("Touchez une étape pour la modifier"))
                     .font(.system(size: 11))
@@ -352,7 +415,6 @@ struct StageEditSheet: View {
     let tripId: UUID
     let stageId: UUID
     @Environment(\.presentationMode) var presentation
-    @AppStorage("fuelUnit") private var fuelUnit = "l"
     @State private var loaded = false
     @State private var type: StageType = .other
     @State private var place = ""
@@ -408,7 +470,7 @@ struct StageEditSheet: View {
                             LabeledField(label: tr("Énergie (kWh)"), placeholder: tr("0"), text: $kwh, keyboard: .decimalPad)
                         }
                         if type.isRefuel {
-                            LabeledField(label: fuelUnit == "gal" ? tr("Volume (gallons)") : tr("Volume (litres)"),
+                            LabeledField(label: Fmt.isImperial ? tr("Volume (gallons)") : tr("Volume (litres)"),
                                          placeholder: tr("0"), text: $fuel, keyboard: .decimalPad)
                         }
                         if type.isCharging || type.isRefuel {

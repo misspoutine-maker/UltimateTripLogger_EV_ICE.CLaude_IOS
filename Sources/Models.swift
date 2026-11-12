@@ -87,6 +87,7 @@ struct Trip: Codable, Identifiable {
     var maxSpeedKmh = 0.0
     var elevationGainMeters = 0.0
     var isOngoing = false
+    var vehicleMode: String?
     var startSoc: Int?
     var endSoc: Int?
     var stages: [Stage] = []

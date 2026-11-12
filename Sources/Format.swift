@@ -16,14 +16,17 @@ enum Fmt {
     }
 
     static func km(_ meters: Double) -> String {
+        if isImperial { return String(format: "%.1f mi", meters / 1609.344) }
         return String(format: "%.1f km", meters / 1000.0)
     }
 
     static func speed(_ kmh: Double) -> String {
+        if isImperial { return "\(Int(kmh * 0.621371)) mph" }
         return "\(Int(kmh)) km/h"
     }
 
     static func meters(_ m: Double) -> String {
+        if isImperial { return "\(Int(m * 3.28084)) ft" }
         return "\(Int(m)) m"
     }
 
@@ -46,26 +49,47 @@ enum Fmt {
         return f.string(from: d)
     }
 
-    static var fuelUnitIsGallons: Bool {
-        return (UserDefaults.standard.string(forKey: "fuelUnit") ?? "l") == "gal"
+    static var isImperial: Bool {
+        return (UserDefaults.standard.string(forKey: "units") ?? "metric") == "imperial"
+    }
+
+    static func dist(_ km: Double) -> Double { return isImperial ? km * 0.621371 : km }
+    static func spd(_ kmh: Double) -> Double { return isImperial ? kmh * 0.621371 : kmh }
+    static func elev(_ m: Double) -> Double { return isImperial ? m * 3.28084 : m }
+    static func vol(_ liters: Double) -> Double { return isImperial ? liters * 0.264172 : liters }
+
+    // Adapte les unités entre parenthèses d'un en-tête de colonne (déjà traduit)
+    static func unitize(_ header: String) -> String {
+        if !isImperial { return header }
+        return header.replacingOccurrences(of: "(km/h)", with: "(mph)")
+            .replacingOccurrences(of: "(km)", with: "(mi)")
+            .replacingOccurrences(of: "(m)", with: "(ft)")
+            .replacingOccurrences(of: "(L)", with: "(gal)")
+    }
+
+    static func modeLabel(_ mode: String?) -> String {
+        let v = mode ?? "ev"
+        if v == "ice" { return "ICE" }
+        if v == "hybrid" { return "PHEV" }
+        return "EV"
     }
 
     static func fuel(_ liters: Double) -> String {
-        if fuelUnitIsGallons { return String(format: "%.1f gal", liters * 0.264172) }
+        if isImperial { return String(format: "%.1f gal", liters * 0.264172) }
         return String(format: "%.1f L", liters)
     }
 
     static func displayToLiters(_ value: Double) -> Double {
-        return fuelUnitIsGallons ? value / 0.264172 : value
+        return isImperial ? value / 0.264172 : value
     }
 
     static func litersToDisplay(_ liters: Double) -> Double {
-        return fuelUnitIsGallons ? liters * 0.264172 : liters
+        return isImperial ? liters * 0.264172 : liters
     }
 
     static func consumption(liters: Double, meters: Double) -> String {
         if liters <= 0 || meters <= 0 { return "–" }
-        if fuelUnitIsGallons {
+        if isImperial {
             let mpg = (meters / 1609.344) / (liters * 0.264172)
             return String(format: "%.1f mpg", mpg)
         }
@@ -90,6 +114,14 @@ enum Theme {
     static let red = Color(hex: 0xFF4B5C)
     static let textPrimary = Color(hex: 0xF2F6FA)
     static let textSecondary = Color(hex: 0xA0AEC0)
+
+    // Une couleur par mode de conduite : EV bleu, ICE rouge, PHEV vert
+    static func mode(_ mode: String?) -> Color {
+        let v = mode ?? "ev"
+        if v == "ice" { return red }
+        if v == "hybrid" { return green }
+        return blue
+    }
 
     static func color(for type: StageType) -> Color {
         switch type {

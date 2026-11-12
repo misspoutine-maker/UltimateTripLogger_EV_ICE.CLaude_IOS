@@ -48,8 +48,11 @@ struct SpeedGauge: View {
 struct LiveTripView: View {
     @EnvironmentObject var t: TrackingManager
     @AppStorage("vehicle") private var vehicle = "ev"
+    @AppStorage("units") private var units = "metric"
     @State private var sheet: LiveSheet?
     @State private var pendingStop: StageType = .charging
+
+    private var modeColor: Color { return Theme.mode(vehicle) }
 
     private var cityText: String {
         return t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city
@@ -78,8 +81,8 @@ struct LiveTripView: View {
                 VStack(spacing: 14) {
                     locationBanner
                     HStack(spacing: 8) {
-                        SpeedGauge(speed: t.speedKmh, maxSpeed: 160, unit: "km/h", color: Theme.blue)
-                        SpeedGauge(speed: t.speedKmh * 0.621371, maxSpeed: 100, unit: "mph", color: Theme.green)
+                        SpeedGauge(speed: t.speedKmh, maxSpeed: 160, unit: "km/h", color: modeColor)
+                        SpeedGauge(speed: t.speedKmh * 0.621371, maxSpeed: 100, unit: "mph", color: Theme.gold)
                     }
                     metrics
                     actions
@@ -122,6 +125,17 @@ struct LiveTripView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(Theme.red)
             }
+            ModeBadge(mode: vehicle)
+            Button {
+                units = (units == "imperial") ? "metric" : "imperial"
+            } label: {
+                Text(units == "imperial" ? "mi" : "km")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(Theme.textPrimary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.border, lineWidth: 1))
+            }
             Button {
                 sheet = .settings
             } label: {
@@ -134,7 +148,7 @@ struct LiveTripView: View {
         .frame(maxWidth: .infinity)
         .background(Theme.surface)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border, lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(modeColor.opacity(0.7), lineWidth: 1.5))
     }
 
     private var metrics: some View {
@@ -175,7 +189,7 @@ struct LiveTripView: View {
     @ViewBuilder
     private var actions: some View {
         if !t.isTracking {
-            bigButton("DÉMARRER LE TRAJET", icon: "play.fill", color: Theme.blue) {
+            bigButton("DÉMARRER LE TRAJET", icon: "play.fill", color: modeColor) {
                 sheet = .start
             }
         } else if let stop = t.activeStop {
@@ -255,7 +269,7 @@ struct LiveTripView: View {
 struct SettingsSheet: View {
     @AppStorage("lang") private var lang = "auto"
     @AppStorage("vehicle") private var vehicle = "ev"
-    @AppStorage("fuelUnit") private var fuelUnit = "l"
+    @AppStorage("units") private var units = "metric"
     @AppStorage("mailTo") private var mailTo = ""
     @Environment(\.presentationMode) var presentation
 
@@ -267,21 +281,25 @@ struct SettingsSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(tr("Type de véhicule")).font(.caption).foregroundColor(Theme.textSecondary)
                         Picker("", selection: $vehicle) {
-                            Text(tr("Électrique")).tag("ev")
-                            Text(tr("Essence")).tag("ice")
-                            Text("PHEV").tag("hybrid")
+                            Text(tr("EV")).tag("ev")
+                            Text(tr("ICE")).tag("ice")
+                            Text(tr("PHEV")).tag("hybrid")
                         }
                         .pickerStyle(SegmentedPickerStyle())
-                    }
-                    if vehicle != "ev" {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(tr("Unité de carburant")).font(.caption).foregroundColor(Theme.textSecondary)
-                            Picker("", selection: $fuelUnit) {
-                                Text(tr("Litres (L)")).tag("l")
-                                Text(tr("Gallons (gal)")).tag("gal")
-                            }
-                            .pickerStyle(SegmentedPickerStyle())
+                        HStack(spacing: 14) {
+                            Text(tr("● EV")).foregroundColor(Theme.blue)
+                            Text(tr("● ICE")).foregroundColor(Theme.red)
+                            Text(tr("● PHEV")).foregroundColor(Theme.green)
                         }
+                        .font(.system(size: 12, weight: .semibold))
+                    }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(tr("Unités")).font(.caption).foregroundColor(Theme.textSecondary)
+                        Picker("", selection: $units) {
+                            Text(tr("Métrique (km, L)")).tag("metric")
+                            Text(tr("Impérial (mi, gal)")).tag("imperial")
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
                     LabeledField(label: tr("Adresse e-mail par défaut (envoi du CSV)"), placeholder: "nom@exemple.com", text: $mailTo, keyboard: .emailAddress)
                     VStack(alignment: .leading, spacing: 6) {
@@ -360,7 +378,6 @@ struct StartSheet: View {
 struct EndStopSheet: View {
     @EnvironmentObject var t: TrackingManager
     @Environment(\.presentationMode) var presentation
-    @AppStorage("fuelUnit") private var fuelUnit = "l"
     @State private var place = ""
     @State private var kwh = ""
     @State private var fuel = ""
@@ -422,7 +439,7 @@ struct EndStopSheet: View {
                             LabeledField(label: tr("Énergie (kWh)"), placeholder: tr("0"), text: $kwh, keyboard: .decimalPad)
                         }
                         if isRefuel {
-                            LabeledField(label: fuelUnit == "gal" ? tr("Volume (gallons)") : tr("Volume (litres)"),
+                            LabeledField(label: Fmt.isImperial ? tr("Volume (gallons)") : tr("Volume (litres)"),
                                          placeholder: tr("0"), text: $fuel, keyboard: .decimalPad)
                         }
                         if isCharging || isRefuel {
