@@ -95,8 +95,14 @@ enum PdfExporter {
         var body: [PdfItem] = []
         body.append(.line("", false))
         body.append(.line(tr("Distance :") + " \(Fmt.km(trip.totalDistanceMeters))", false))
-        body.append(.line(tr("Conduite :") + " \(Fmt.human(trip.drivingSeconds))   " + tr("Recharge :") + " \(Fmt.human(trip.chargingSeconds))   " + tr("Repas :") + " \(Fmt.human(trip.mealSeconds))", false))
-        body.append(.line(tr("Vitesse moy. :") + " \(Fmt.speed(trip.avgSpeedKmh))   max : \(Fmt.speed(trip.maxSpeedKmh))   " + tr("Dénivelé + :") + " \(Fmt.meters(trip.elevationGainMeters))", false))
+        var l2 = tr("Conduite :") + " " + Fmt.human(trip.drivingSeconds)
+        l2 += "   " + tr("Recharge :") + " " + Fmt.human(trip.chargingSeconds)
+        l2 += "   " + tr("Repas :") + " " + Fmt.human(trip.mealSeconds)
+        body.append(.line(l2, false))
+        var l3 = tr("Vitesse moy. :") + " " + Fmt.speed(trip.avgSpeedKmh)
+        l3 += "   max : " + Fmt.speed(trip.maxSpeedKmh)
+        l3 += "   " + tr("Dénivelé + :") + " " + Fmt.meters(trip.elevationGainMeters)
+        body.append(.line(l3, false))
         if trip.startSoc != nil || trip.endSoc != nil {
             let a = trip.startSoc.map { "\($0)" } ?? "–"
             let b = trip.endSoc.map { "\($0)" } ?? "–"
@@ -122,14 +128,24 @@ enum PdfExporter {
     // MARK: PDF d'un jour (une carte par trajet)
 
     static func dayPDF(_ day: DayRecap, completion: @escaping (URL?) -> Void) {
-        let head: [PdfItem] = [
-            .line(tr("Récap du") + " \(Fmt.day(day.id))", true),
-            .line("", false),
-            .line(tr("Trajets :") + " \(day.trips.count)   " + tr("Distance :") + " \(Fmt.km(day.distance))   " + tr("Conduite :") + " \(Fmt.human(day.driving))", false),
-            .line(tr("Vitesse moy. :") + " \(Fmt.speed(day.avgSpeed))   max : \(Fmt.speed(day.maxSpeed))   " + tr("Dénivelé + :") + " \(Fmt.meters(day.gain))", false),
-            .line(tr("Énergie :") + String(format: " %.1f kWh   ", day.kwh) + tr("Coût :") + String(format: " %.2f $   ", day.cost) + tr("Recharges :") + " \(day.chargeCount)", false),
-            .line(tr("Recharge :") + " \(Fmt.human(day.charging))   " + tr("Repas :") + " \(Fmt.human(day.meal))", false)
-        ]
+        var head: [PdfItem] = []
+        head.append(.line(tr("Récap du") + " " + Fmt.day(day.id), true))
+        head.append(.line("", false))
+        var h1 = tr("Trajets :") + " \(day.trips.count)"
+        h1 += "   " + tr("Distance :") + " " + Fmt.km(day.distance)
+        h1 += "   " + tr("Conduite :") + " " + Fmt.human(day.driving)
+        head.append(.line(h1, false))
+        var h2 = tr("Vitesse moy. :") + " " + Fmt.speed(day.avgSpeed)
+        h2 += "   max : " + Fmt.speed(day.maxSpeed)
+        h2 += "   " + tr("Dénivelé + :") + " " + Fmt.meters(day.gain)
+        head.append(.line(h2, false))
+        var h3 = tr("Énergie :") + " " + String(format: "%.1f kWh", day.kwh)
+        h3 += "   " + tr("Coût :") + " " + String(format: "%.2f $", day.cost)
+        h3 += "   " + tr("Recharges :") + " \(day.chargeCount)"
+        head.append(.line(h3, false))
+        var h4 = tr("Recharge :") + " " + Fmt.human(day.charging)
+        h4 += "   " + tr("Repas :") + " " + Fmt.human(day.meal)
+        head.append(.line(h4, false))
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
         let name = "Recap_\(df.string(from: day.id)).pdf"
@@ -332,6 +348,10 @@ enum XlsxExporter {
         return (v * m).rounded() / m
     }
 
+    private static func n(_ v: Double, _ digits: Int = 1) -> XCell {
+        return .number(r(v, digits))
+    }
+
     private static func soc(_ v: Int?) -> XCell {
         if let v = v { return .number(Double(v)) }
         return .text("")
@@ -344,51 +364,80 @@ enum XlsxExporter {
         dayFmt.dateFormat = "yyyy-MM-dd"
 
         // Feuille 1 : résumé par jour
-        var daily: [[XCell]] = [headerRow(["Date", "Trajets", "Distance (km)", "Conduite (min)", "Recharge (min)",
-                                            "Repas (min)", "Énergie (kWh)", "Carburant (L)", "Coût",
-                                            "Recharges / pleins", "Vitesse moy. (km/h)", "Vitesse max (km/h)",
-                                            "Dénivelé + (m)"])]
+        var daily: [[XCell]] = []
+        daily.append(headerRow(["Date", "Trajets", "Distance (km)", "Conduite (min)", "Recharge (min)",
+                                "Repas (min)", "Énergie (kWh)", "Carburant (L)", "Coût",
+                                "Recharges / pleins", "Vitesse moy. (km/h)", "Vitesse max (km/h)",
+                                "Dénivelé + (m)"]))
         for d in DayRecap.group(done).sorted(by: { $0.id < $1.id }) {
-            daily.append([
-                .text(dayFmt.string(from: d.id)), .number(Double(d.trips.count)),
-                .number(r(d.distance / 1000.0)), .number(r(Double(d.driving) / 60.0, 0)),
-                .number(r(Double(d.charging) / 60.0, 0)), .number(r(Double(d.meal) / 60.0, 0)),
-                .number(r(d.kwh)), .number(r(d.fuelLiters)), .number(r(d.cost, 2)),
-                .number(Double(d.chargeCount)), .number(r(d.avgSpeed)), .number(r(d.maxSpeed)),
-                .number(r(d.gain, 0))
-            ])
+            var row: [XCell] = []
+            row.append(.text(dayFmt.string(from: d.id)))
+            row.append(n(Double(d.trips.count), 0))
+            row.append(n(d.distance / 1000.0))
+            row.append(n(Double(d.driving) / 60.0, 0))
+            row.append(n(Double(d.charging) / 60.0, 0))
+            row.append(n(Double(d.meal) / 60.0, 0))
+            row.append(n(d.kwh))
+            row.append(n(d.fuelLiters))
+            row.append(n(d.cost, 2))
+            row.append(n(Double(d.chargeCount), 0))
+            row.append(n(d.avgSpeed))
+            row.append(n(d.maxSpeed))
+            row.append(n(d.gain, 0))
+            daily.append(row)
         }
 
         // Feuille 2 : trajets
-        var tripRows: [[XCell]] = [headerRow(["Date", "Départ", "Arrivée", "Distance (km)", "Conduite (min)",
-                                              "Recharge (min)", "Repas (min)", "Autre (min)", "Vitesse moy. (km/h)",
-                                              "Vitesse max (km/h)", "Dénivelé + (m)", "SOC départ (%)",
-                                              "SOC arrivée (%)", "Énergie (kWh)", "Carburant (L)", "Coût"])]
+        var tripRows: [[XCell]] = []
+        tripRows.append(headerRow(["Date", "Départ", "Arrivée", "Distance (km)", "Conduite (min)",
+                                   "Recharge (min)", "Repas (min)", "Autre (min)", "Vitesse moy. (km/h)",
+                                   "Vitesse max (km/h)", "Dénivelé + (m)", "SOC départ (%)",
+                                   "SOC arrivée (%)", "Énergie (kWh)", "Carburant (L)", "Coût"]))
         for t in done {
-            tripRows.append([
-                .text(Fmt.dateTime(t.startTime)), .text(t.startPlace), .text(t.endPlace),
-                .number(r(t.totalDistanceMeters / 1000.0)), .number(r(Double(t.drivingSeconds) / 60.0, 0)),
-                .number(r(Double(t.chargingSeconds) / 60.0, 0)), .number(r(Double(t.mealSeconds) / 60.0, 0)),
-                .number(r(Double(t.otherSeconds) / 60.0, 0)), .number(r(t.avgSpeedKmh)), .number(r(t.maxSpeedKmh)),
-                .number(r(t.elevationGainMeters, 0)), soc(t.startSoc), soc(t.endSoc),
-                .number(r(t.totalKwh)), .number(r(t.totalFuelLiters)), .number(r(t.totalCost, 2))
-            ])
+            var row: [XCell] = []
+            row.append(.text(Fmt.dateTime(t.startTime)))
+            row.append(.text(t.startPlace))
+            row.append(.text(t.endPlace))
+            row.append(n(t.totalDistanceMeters / 1000.0))
+            row.append(n(Double(t.drivingSeconds) / 60.0, 0))
+            row.append(n(Double(t.chargingSeconds) / 60.0, 0))
+            row.append(n(Double(t.mealSeconds) / 60.0, 0))
+            row.append(n(Double(t.otherSeconds) / 60.0, 0))
+            row.append(n(t.avgSpeedKmh))
+            row.append(n(t.maxSpeedKmh))
+            row.append(n(t.elevationGainMeters, 0))
+            row.append(soc(t.startSoc))
+            row.append(soc(t.endSoc))
+            row.append(n(t.totalKwh))
+            row.append(n(t.totalFuelLiters))
+            row.append(n(t.totalCost, 2))
+            tripRows.append(row)
         }
 
         // Feuille 3 : étapes
-        var stageRows: [[XCell]] = [headerRow(["Date", "Type", "Lieu", "Arrivée à", "Durée (min)",
-                                               "Distance étape (km)", "Depuis recharge (km)", "Énergie (kWh)",
-                                               "Carburant (L)", "Coût", "Réseau", "SOC début (%)", "SOC fin (%)",
-                                               "Notes"])]
+        var stageRows: [[XCell]] = []
+        stageRows.append(headerRow(["Date", "Type", "Lieu", "Arrivée à", "Durée (min)",
+                                    "Distance étape (km)", "Depuis recharge (km)", "Énergie (kWh)",
+                                    "Carburant (L)", "Coût", "Réseau", "SOC début (%)", "SOC fin (%)",
+                                    "Notes"]))
         for t in done {
             for s in t.stages {
-                stageRows.append([
-                    .text(Fmt.dateTime(t.startTime)), .text(s.type.label), .text(s.placeName),
-                    .text(Fmt.dateTime(s.arrival)), .number(r(Double(s.durationSeconds) / 60.0, 0)),
-                    .number(r(s.distanceFromPrevMeters / 1000.0)), .number(r(s.distanceSinceLastChargeMeters / 1000.0)),
-                    .number(r(s.energyKwh)), .number(r(s.fuelLiters ?? 0)), .number(r(s.cost, 2)),
-                    .text(s.network), soc(s.startSoc), soc(s.endSoc), .text(s.notes)
-                ])
+                var row: [XCell] = []
+                row.append(.text(Fmt.dateTime(t.startTime)))
+                row.append(.text(s.type.label))
+                row.append(.text(s.placeName))
+                row.append(.text(Fmt.dateTime(s.arrival)))
+                row.append(n(Double(s.durationSeconds) / 60.0, 0))
+                row.append(n(s.distanceFromPrevMeters / 1000.0))
+                row.append(n(s.distanceSinceLastChargeMeters / 1000.0))
+                row.append(n(s.energyKwh))
+                row.append(n(s.fuelLiters ?? 0))
+                row.append(n(s.cost, 2))
+                row.append(.text(s.network))
+                row.append(soc(s.startSoc))
+                row.append(soc(s.endSoc))
+                row.append(.text(s.notes))
+                stageRows.append(row)
             }
         }
 
