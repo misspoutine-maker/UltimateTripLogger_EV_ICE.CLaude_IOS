@@ -1,43 +1,47 @@
 import SwiftUI
 
 enum LiveSheet: Identifiable {
-    case start, endStop, endTrip, settings
+    case start, endStop, endTrip, settings, stopSoc
     var id: Int {
         switch self {
         case .start: return 0
         case .endStop: return 1
         case .endTrip: return 2
         case .settings: return 3
+        case .stopSoc: return 4
         }
     }
 }
 
 struct SpeedGauge: View {
     let speed: Double
-    private let maxSpeed = 160.0
+    let maxSpeed: Double
+    let unit: String
+    let color: Color
+    var size: CGFloat = 165
 
     var body: some View {
         let frac = min(max(speed / maxSpeed, 0), 1)
         ZStack {
             Circle()
                 .trim(from: 0, to: 0.75)
-                .stroke(Theme.card, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                .stroke(Theme.card, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(135))
             Circle()
                 .trim(from: 0, to: 0.75 * frac)
-                .stroke(Theme.blue, style: StrokeStyle(lineWidth: 16, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                 .rotationEffect(.degrees(135))
                 .animation(.easeOut(duration: 0.3), value: frac)
             VStack(spacing: 0) {
                 Text("\(Int(speed))")
-                    .font(.system(size: 64, weight: .heavy, design: .rounded))
+                    .font(.system(size: 46, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.textPrimary)
-                Text(tr("km/h"))
-                    .font(.system(size: 14, weight: .semibold))
+                Text(unit)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.textSecondary)
             }
         }
-        .frame(width: 210, height: 210)
+        .frame(width: size, height: size)
     }
 }
 
@@ -45,6 +49,7 @@ struct LiveTripView: View {
     @EnvironmentObject var t: TrackingManager
     @AppStorage("vehicle") private var vehicle = "ev"
     @State private var sheet: LiveSheet?
+    @State private var pendingStop: StageType = .charging
 
     private var cityText: String {
         return t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city
@@ -72,7 +77,10 @@ struct LiveTripView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     locationBanner
-                    SpeedGauge(speed: t.speedKmh)
+                    HStack(spacing: 8) {
+                        SpeedGauge(speed: t.speedKmh, maxSpeed: 160, unit: "km/h", color: Theme.blue)
+                        SpeedGauge(speed: t.speedKmh * 0.621371, maxSpeed: 100, unit: "mph", color: Theme.green)
+                    }
                     metrics
                     actions
                     Text(AppInfo.versionString)
@@ -89,6 +97,7 @@ struct LiveTripView: View {
             case .endStop: EndStopSheet().environmentObject(t)
             case .endTrip: EndTripSheet().environmentObject(t)
             case .settings: SettingsSheet()
+            case .stopSoc: StopSocSheet(type: pendingStop).environmentObject(t)
             }
         }
     }
@@ -205,7 +214,12 @@ struct LiveTripView: View {
 
     private func stopButton(_ type: StageType) -> some View {
         Button {
-            t.beginStop(type)
+            if type.isCharging {
+                pendingStop = type
+                sheet = .stopSoc
+            } else {
+                t.beginStop(type)
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: type.icon)
@@ -242,6 +256,7 @@ struct SettingsSheet: View {
     @AppStorage("lang") private var lang = "auto"
     @AppStorage("vehicle") private var vehicle = "ev"
     @AppStorage("fuelUnit") private var fuelUnit = "l"
+    @AppStorage("mailTo") private var mailTo = ""
     @Environment(\.presentationMode) var presentation
 
     var body: some View {
@@ -254,7 +269,7 @@ struct SettingsSheet: View {
                         Picker("", selection: $vehicle) {
                             Text(tr("Électrique")).tag("ev")
                             Text(tr("Essence")).tag("ice")
-                            Text(tr("Hybride")).tag("hybrid")
+                            Text("PHEV").tag("hybrid")
                         }
                         .pickerStyle(SegmentedPickerStyle())
                     }
@@ -268,6 +283,7 @@ struct SettingsSheet: View {
                             .pickerStyle(SegmentedPickerStyle())
                         }
                     }
+                    LabeledField(label: tr("Adresse e-mail par défaut (envoi du CSV)"), placeholder: "nom@exemple.com", text: $mailTo, keyboard: .emailAddress)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(tr("Langue")).font(.caption).foregroundColor(Theme.textSecondary)
                         Picker("", selection: $lang) {
@@ -440,6 +456,7 @@ struct EndStopSheet: View {
                 }
             }
             .onAppear {
+                startSoc = t.activeStopStartSoc.map { "\($0)" } ?? ""
                 let c = t.currentCoordinate
                 PoiFinder.find(lat: c.0, lng: c.1, type: t.activeStop) { pois = $0 }
             }
@@ -495,6 +512,52 @@ struct EndTripSheet: View {
                     Button(tr("Annuler")) { presentation.wrappedValue.dismiss() }
                 }
             }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+struct StopSocSheet: View {
+    let type: StageType
+    @EnvironmentObject var t: TrackingManager
+    @Environment(\.presentationMode) var presentation
+    @State private var soc = ""
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                VStack(spacing: 16) {
+                    Text(type.label)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Theme.color(for: type))
+                    LabeledField(label: tr("Batterie actuelle (%)"), placeholder: "ex. 20", text: $soc, keyboard: .numberPad)
+                    Button {
+                        t.beginStop(type, startSoc: parseSoc(soc))
+                        presentation.wrappedValue.dismiss()
+                    } label: {
+                        Text(tr("Démarrer l'arrêt"))
+                            .font(.system(size: 17, weight: .heavy))
+                            .foregroundColor(Theme.background)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(Theme.color(for: type))
+                            .cornerRadius(14)
+                    }
+                    Button {
+                        t.beginStop(type, startSoc: nil)
+                        presentation.wrappedValue.dismiss()
+                    } label: {
+                        Text(tr("Passer"))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .navigationTitle(tr("Début de l'arrêt"))
+            .navigationBarTitleDisplayMode(.inline)
         }
         .preferredColorScheme(.dark)
     }

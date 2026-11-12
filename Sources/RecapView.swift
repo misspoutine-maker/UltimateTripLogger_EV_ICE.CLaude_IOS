@@ -21,16 +21,21 @@ struct DayRecap: Identifiable {
     var kwhPer100: Double { distance > 0 ? kwh / (distance / 1000.0) * 100.0 : 0 }
 }
 
-struct RecapView: View {
-    @ObservedObject var store: TripStore
-
-    private var days: [DayRecap] {
+extension DayRecap {
+    static func group(_ trips: [Trip]) -> [DayRecap] {
         let cal = Calendar.current
-        let done = store.trips.filter { !$0.isOngoing }
+        let done = trips.filter { !$0.isOngoing }
         let grouped = Dictionary(grouping: done) { cal.startOfDay(for: $0.startTime) }
         return grouped.map { DayRecap(id: $0.key, trips: $0.value.sorted { $0.startTime < $1.startTime }) }
             .sorted { $0.id > $1.id }
     }
+}
+
+struct RecapView: View {
+    @ObservedObject var store: TripStore
+    @State private var share: ShareItem?
+
+    private var days: [DayRecap] { DayRecap.group(store.trips) }
 
     var body: some View {
         NavigationView {
@@ -55,8 +60,21 @@ struct RecapView: View {
                 }
             }
             .navigationTitle(tr("Récap"))
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        if let url = XlsxExporter.workbook(trips: store.trips, name: "Resume_Trajets.xlsx") {
+                            share = ShareItem(url: url)
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(days.isEmpty)
+                }
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
+        .sheet(item: $share) { item in ShareSheet(url: item.url) }
     }
 
     private var totalsCard: some View {
@@ -122,7 +140,6 @@ struct DayDetailView: View {
     @ObservedObject var store: TripStore
     let day: DayRecap
     @State private var share: ShareItem?
-    @State private var copied = false
 
     var body: some View {
         ZStack {
@@ -165,12 +182,17 @@ struct DayDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    Button(tr("Exporter en PDF")) {
-                        if let url = PdfExporter.dayPDF(day) { share = ShareItem(url: url) }
+                    Button(tr("Exporter en PDF (avec carte)")) {
+                        PdfExporter.dayPDF(day) { url in
+                            if let url = url { share = ShareItem(url: url) }
+                        }
                     }
-                    Button(tr("Copier pour Google Sheets")) {
-                        SheetsExport.copy(day.trips)
-                        copied = true
+                    Button(tr("Exporter pour Google Sheets (.xlsx)")) {
+                        let df = DateFormatter()
+                        df.dateFormat = "yyyy-MM-dd"
+                        if let url = XlsxExporter.workbook(trips: day.trips, name: "Resume_\(df.string(from: day.id)).xlsx") {
+                            share = ShareItem(url: url)
+                        }
                     }
                 } label: {
                     Image(systemName: "square.and.arrow.up")
@@ -178,6 +200,5 @@ struct DayDetailView: View {
             }
         }
         .sheet(item: $share) { item in ShareSheet(url: item.url) }
-        .alert(isPresented: $copied) { copiedAlert }
     }
 }

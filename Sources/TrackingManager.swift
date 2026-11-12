@@ -22,6 +22,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
     @Published var elevationGain = 0.0
     @Published var activeStop: StageType?
     @Published var activeStopSeconds = 0
+    @Published var activeStopStartSoc: Int?
     @Published var sinceChargeMeters = 0.0
     @Published var authStatus: CLAuthorizationStatus = .notDetermined
 
@@ -422,9 +423,10 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         if let local = trip { t.stages = local.stages; t.points = local.points }
     }
 
-    func beginStop(_ type: StageType) {
+    func beginStop(_ type: StageType, startSoc: Int? = nil) {
         guard isTracking, activeStop == nil else { return }
         activeStop = type
+        activeStopStartSoc = startSoc
         stopStart = Date()
         activeStopSeconds = 0
     }
@@ -459,6 +461,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         if type.isCharging || type.isRefuel { chargeAnchor = distanceMeters }
         stageAnchor = distanceMeters
         activeStop = nil
+        activeStopStartSoc = nil
         stopStart = nil
         activeStopSeconds = 0
 

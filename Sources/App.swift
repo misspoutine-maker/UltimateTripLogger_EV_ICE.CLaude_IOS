@@ -1,4 +1,5 @@
 import SwiftUI
+import MessageUI
 
 @main
 struct UltimateTripLoggerApp: App {
@@ -43,6 +44,49 @@ struct RootView: View {
 struct ShareItem: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+struct MailItem: Identifiable {
+    let id = UUID()
+    let url: URL
+    let subject: String
+}
+
+struct MailComposer: UIViewControllerRepresentable {
+    let item: MailItem
+    @Environment(\.presentationMode) var presentation
+
+    static var canSend: Bool { MFMailComposeViewController.canSendMail() }
+
+    func makeUIViewController(context: Context) -> MFMailComposeViewController {
+        let vc = MFMailComposeViewController()
+        vc.mailComposeDelegate = context.coordinator
+        vc.setSubject(item.subject)
+        let to = UserDefaults.standard.string(forKey: "mailTo") ?? ""
+        if !to.isEmpty { vc.setToRecipients([to]) }
+        vc.setMessageBody(item.subject, isHTML: false)
+        if let data = try? Data(contentsOf: item.url) {
+            vc.addAttachmentData(data, mimeType: "text/csv", fileName: item.url.lastPathComponent)
+        }
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(presentation: $presentation) }
+
+    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        let presentation: Binding<PresentationMode>
+
+        init(presentation: Binding<PresentationMode>) {
+            self.presentation = presentation
+        }
+
+        func mailComposeController(_ controller: MFMailComposeViewController,
+                                   didFinishWith result: MFMailComposeResult, error: Error?) {
+            presentation.wrappedValue.dismiss()
+        }
+    }
 }
 
 struct ShareSheet: UIViewControllerRepresentable {
@@ -92,6 +136,7 @@ struct LabeledField: View {
             TextField(placeholder, text: $text)
                 .keyboardType(keyboard)
                 .textFieldStyle(.roundedBorder)
+                .autocapitalization(keyboard == .emailAddress ? .none : .sentences)
         }
     }
 }

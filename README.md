@@ -1,4 +1,4 @@
-# Ultimate Trip Logger (iOS) — phases 1-5 (v5.0)
+# Ultimate Trip Logger (iOS) — phases 1-7 (v7.0)
 
 SwiftUI, iOS 15+ (iPhone 8). Suivi GPS, arrêts (recharge/repas/autre), frontières, historique, carte du parcours, récap quotidien, profil d'altitude, lieux à proximité aux arrêts, export CSV, PDF et Google Sheets.
 

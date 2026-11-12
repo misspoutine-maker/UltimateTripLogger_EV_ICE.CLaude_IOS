@@ -1,15 +1,17 @@
 import SwiftUI
 
-var copiedAlert: Alert {
-    return Alert(title: Text(tr("Copié")),
-                        message: Text(tr("Ouvre Google Sheets, appui long sur une cellule → Coller.")),
-                 dismissButton: .default(Text(tr("OK"))))
-}
-
 struct HistoryView: View {
     @ObservedObject var store: TripStore
     @State private var share: ShareItem?
-    @State private var copied = false
+    @State private var mail: MailItem?
+
+    private func sendMail(_ url: URL) {
+        if MailComposer.canSend {
+            mail = MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger"))
+        } else {
+            share = ShareItem(url: url)
+        }
+    }
 
     var body: some View {
         NavigationView {
@@ -32,16 +34,18 @@ struct HistoryView: View {
                     }
                 }
             }
+            .sheet(item: $mail) { item in MailComposer(item: item) }
             .navigationTitle(tr("Historique"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button(tr("Exporter tout en CSV")) {
-                            if let url = CsvExporter.allTripsCSV(store.trips) { share = ShareItem(url: url) }
+                        Button(tr("Envoyer tout en CSV par e-mail")) {
+                            if let url = CsvExporter.allTripsCSV(store.trips) { sendMail(url) }
                         }
-                        Button(tr("Copier pour Google Sheets")) {
-                            SheetsExport.copy(store.trips)
-                            copied = true
+                        Button(tr("Exporter pour Google Sheets (.xlsx)")) {
+                            if let url = XlsxExporter.workbook(trips: store.trips, name: "Resume_Trajets.xlsx") {
+                                share = ShareItem(url: url)
+                            }
                         }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
@@ -52,7 +56,6 @@ struct HistoryView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(item: $share) { item in ShareSheet(url: item.url) }
-        .alert(isPresented: $copied) { copiedAlert }
     }
 }
 
@@ -103,12 +106,14 @@ struct TripRow: View {
 
 enum DetailSheet: Identifiable {
     case share(ShareItem)
+    case mail(MailItem)
     case editTrip
     case editStage(UUID)
 
     var id: String {
         switch self {
         case .share(let item): return "s-\(item.id.uuidString)"
+        case .mail(let item): return "m-\(item.id.uuidString)"
         case .editTrip: return "trip"
         case .editStage(let u): return "e-\(u.uuidString)"
         }
@@ -176,8 +181,19 @@ struct TripDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(tr("Modifier le trajet")) { sheet = .editTrip }
-                    Button(tr("Exporter en CSV")) {
-                        if let trip = trip, let url = CsvExporter.tripCSV(trip) { sheet = .share(ShareItem(url: url)) }
+                    Button(tr("Envoyer le CSV par e-mail")) {
+                        if let trip = trip, let url = CsvExporter.tripCSV(trip) {
+                            let next: DetailSheet = MailComposer.canSend
+                                ? .mail(MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger")))
+                                : .share(ShareItem(url: url))
+                            sheet = next
+                        }
+                    }
+                    Button(tr("Exporter pour Google Sheets (.xlsx)")) {
+                        if let trip = trip,
+                           let url = XlsxExporter.workbook(trips: [trip], name: "Trajet.xlsx") {
+                            sheet = .share(ShareItem(url: url))
+                        }
                     }
                     Button(tr("Exporter en PDF (avec carte)")) {
                         if let trip = trip {
@@ -194,6 +210,7 @@ struct TripDetailView: View {
         .sheet(item: $sheet) { which in
             switch which {
             case .share(let item): ShareSheet(url: item.url)
+            case .mail(let item): MailComposer(item: item)
             case .editTrip: TripEditSheet(store: store, tripId: tripId)
             case .editStage(let id): StageEditSheet(store: store, tripId: tripId, stageId: id)
             }

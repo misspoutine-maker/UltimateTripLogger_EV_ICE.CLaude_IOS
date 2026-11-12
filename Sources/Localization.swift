@@ -158,7 +158,21 @@ private let englishPairs: [(String, String)] = [
     ("Adresse", "Address"),
     ("Hôtel", "Hotel"),
     ("Dénivelé + (m)", "Elevation gain (m)"),
-    ("● En cours", "● In progress")
+    ("● En cours", "● In progress"),
+    ("Résumés", "Summary"),
+    ("Trajets", "Trips"),
+    ("Recharges / pleins", "Charges / fill-ups"),
+    ("Conduite (min)", "Driving (min)"),
+    ("Exporter pour Google Sheets (.xlsx)", "Export for Google Sheets (.xlsx)"),
+    ("Batterie actuelle (%)", "Current battery (%)"),
+    ("Début de l'arrêt", "Start of stop"),
+    ("Démarrer l'arrêt", "Start stop"),
+    ("Passer", "Skip"),
+    ("Envoyer tout en CSV par e-mail", "Email all as CSV"),
+    ("Envoyer le CSV par e-mail", "Email CSV file"),
+    ("Export CSV Ultimate Trip Logger", "Ultimate Trip Logger CSV export"),
+    ("Adresse e-mail par défaut (envoi du CSV)", "Default email address (CSV export)"),
+    ("Énergie (kWh)", "Energy (kWh)")
 ]
 
 let englishStrings: [String: String] = Dictionary(englishPairs, uniquingKeysWith: { first, _ in first })
