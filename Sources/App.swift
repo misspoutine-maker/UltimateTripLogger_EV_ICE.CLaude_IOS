@@ -54,7 +54,7 @@ struct MailItem: Identifiable {
 
 struct MailComposer: UIViewControllerRepresentable {
     let item: MailItem
-    @Environment(\.presentationMode) var presentation
+    let onDismiss: () -> Void
 
     static var canSend: Bool { MFMailComposeViewController.canSendMail() }
 
@@ -73,18 +73,18 @@ struct MailComposer: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(presentation: $presentation) }
+    func makeCoordinator() -> Coordinator { Coordinator(onDismiss: onDismiss) }
 
     final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
-        let presentation: Binding<PresentationMode>
+        let onDismiss: () -> Void
 
-        init(presentation: Binding<PresentationMode>) {
-            self.presentation = presentation
+        init(onDismiss: @escaping () -> Void) {
+            self.onDismiss = onDismiss
         }
 
         func mailComposeController(_ controller: MFMailComposeViewController,
                                    didFinishWith result: MFMailComposeResult, error: Error?) {
-            presentation.wrappedValue.dismiss()
+            onDismiss()
         }
     }
 }

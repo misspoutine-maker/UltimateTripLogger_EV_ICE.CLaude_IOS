@@ -34,7 +34,7 @@ struct HistoryView: View {
                     }
                 }
             }
-            .sheet(item: $mail) { item in MailComposer(item: item) }
+            .sheet(item: $mail) { item in MailComposer(item: item, onDismiss: { mail = nil }) }
             .navigationTitle(tr("Historique"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -210,7 +210,7 @@ struct TripDetailView: View {
         .sheet(item: $sheet) { which in
             switch which {
             case .share(let item): ShareSheet(url: item.url)
-            case .mail(let item): MailComposer(item: item)
+            case .mail(let item): MailComposer(item: item, onDismiss: { sheet = nil })
             case .editTrip: TripEditSheet(store: store, tripId: tripId)
             case .editStage(let id): StageEditSheet(store: store, tripId: tripId, stageId: id)
             }
