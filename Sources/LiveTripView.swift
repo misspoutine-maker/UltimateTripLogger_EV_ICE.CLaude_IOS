@@ -112,12 +112,6 @@ struct LiveTripView: View {
                 Text(cityText)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
-                if !t.address.isEmpty {
-                    Text(t.address)
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.textSecondary)
-                        .lineLimit(2)
-                }
             }
             Spacer()
             if t.isTracking {
@@ -270,7 +264,6 @@ struct SettingsSheet: View {
     @AppStorage("lang") private var lang = "auto"
     @AppStorage("vehicle") private var vehicle = "ev"
     @AppStorage("units") private var units = "metric"
-    @AppStorage("mailTo") private var mailTo = ""
     @Environment(\.presentationMode) var presentation
 
     var body: some View {
@@ -301,7 +294,6 @@ struct SettingsSheet: View {
                         }
                         .pickerStyle(SegmentedPickerStyle())
                     }
-                    LabeledField(label: tr("Adresse e-mail par défaut (envoi du CSV)"), placeholder: "nom@exemple.com", text: $mailTo, keyboard: .emailAddress)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(tr("Langue")).font(.caption).foregroundColor(Theme.textSecondary)
                         Picker("", selection: $lang) {
@@ -494,6 +486,7 @@ struct EndTripSheet: View {
     @Environment(\.presentationMode) var presentation
     @AppStorage("vehicle") private var vehicle = "ev"
     @State private var soc = ""
+    @State private var place = ""
 
     var body: some View {
         NavigationView {
@@ -503,11 +496,12 @@ struct EndTripSheet: View {
                     Text("\(Fmt.km(t.distanceMeters)) • \(Fmt.human(t.tripSeconds))")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(Theme.textPrimary)
+                    LabeledField(label: tr("Lieu d'arrivée"), placeholder: t.city == TrackingManager.placeholderCity ? tr("Détection GPS…") : t.city, text: $place)
                     if vehicle != "ice" {
                         LabeledField(label: tr("Batterie à l'arrivée en % (optionnel)"), placeholder: tr("ex. 35"), text: $soc, keyboard: .numberPad)
                     }
                     Button {
-                        t.endTrip(endSoc: parseSoc(soc))
+                        t.endTrip(endSoc: parseSoc(soc), place: place.trimmingCharacters(in: .whitespaces))
                         presentation.wrappedValue.dismiss()
                     } label: {
                         Text(tr("Terminer et enregistrer"))

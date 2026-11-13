@@ -1,5 +1,4 @@
 import SwiftUI
-import MessageUI
 
 @main
 struct UltimateTripLoggerApp: App {
@@ -59,49 +58,6 @@ struct ModeBadge: View {
             .padding(.vertical, 2)
             .background(Theme.mode(mode))
             .cornerRadius(6)
-    }
-}
-
-struct MailItem: Identifiable {
-    let id = UUID()
-    let url: URL
-    let subject: String
-}
-
-struct MailComposer: UIViewControllerRepresentable {
-    let item: MailItem
-    let onDismiss: () -> Void
-
-    static var canSend: Bool { MFMailComposeViewController.canSendMail() }
-
-    func makeUIViewController(context: Context) -> MFMailComposeViewController {
-        let vc = MFMailComposeViewController()
-        vc.mailComposeDelegate = context.coordinator
-        vc.setSubject(item.subject)
-        let to = UserDefaults.standard.string(forKey: "mailTo") ?? ""
-        if !to.isEmpty { vc.setToRecipients([to]) }
-        vc.setMessageBody(item.subject, isHTML: false)
-        if let data = try? Data(contentsOf: item.url) {
-            vc.addAttachmentData(data, mimeType: "text/csv", fileName: item.url.lastPathComponent)
-        }
-        return vc
-    }
-
-    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onDismiss: onDismiss) }
-
-    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
-        let onDismiss: () -> Void
-
-        init(onDismiss: @escaping () -> Void) {
-            self.onDismiss = onDismiss
-        }
-
-        func mailComposeController(_ controller: MFMailComposeViewController,
-                                   didFinishWith result: MFMailComposeResult, error: Error?) {
-            onDismiss()
-        }
     }
 }
 

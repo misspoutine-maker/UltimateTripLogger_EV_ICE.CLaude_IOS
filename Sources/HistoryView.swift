@@ -3,15 +3,6 @@ import SwiftUI
 struct HistoryView: View {
     @ObservedObject var store: TripStore
     @State private var share: ShareItem?
-    @State private var mail: MailItem?
-
-    private func sendMail(_ url: URL) {
-        if MailComposer.canSend {
-            mail = MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger"))
-        } else {
-            share = ShareItem(url: url)
-        }
-    }
 
     var body: some View {
         NavigationView {
@@ -44,9 +35,6 @@ struct HistoryView: View {
                                                 if let url = url { share = ShareItem(url: url) }
                                             }
                                         }
-                                        Button(tr("Envoyer le CSV par e-mail")) {
-                                            if let url = CsvExporter.tripCSV(trip) { sendMail(url) }
-                                        }
                                     }
                                 }
                             }
@@ -55,18 +43,12 @@ struct HistoryView: View {
                     }
                 }
             }
-            .sheet(item: $mail) { item in MailComposer(item: item, onDismiss: { mail = nil }) }
             .navigationTitle(tr("Historique"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(tr("Envoyer tout en CSV par e-mail")) {
-                            if let url = CsvExporter.allTripsCSV(store.trips) { sendMail(url) }
-                        }
-                        Button(tr("Exporter pour Google Sheets (.xlsx)")) {
-                            if let url = XlsxExporter.workbook(trips: store.trips, name: "Resume_Trajets.xlsx") {
-                                share = ShareItem(url: url)
-                            }
+                    Button {
+                        if let url = XlsxExporter.workbook(trips: store.trips, name: "Resume_Trajets.xlsx") {
+                            share = ShareItem(url: url)
                         }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
@@ -128,14 +110,12 @@ struct TripRow: View {
 
 enum DetailSheet: Identifiable {
     case share(ShareItem)
-    case mail(MailItem)
     case editTrip
     case editStage(UUID)
 
     var id: String {
         switch self {
         case .share(let item): return "s-\(item.id.uuidString)"
-        case .mail(let item): return "m-\(item.id.uuidString)"
         case .editTrip: return "trip"
         case .editStage(let u): return "e-\(u.uuidString)"
         }
@@ -161,14 +141,6 @@ struct TripDetailView: View {
         PdfExporter.tripPDF(trip) { url in
             if let url = url { sheet = .share(ShareItem(url: url)) }
         }
-    }
-
-    private func exportCSV(_ trip: Trip) {
-        guard let url = CsvExporter.tripCSV(trip) else { return }
-        let next: DetailSheet = MailComposer.canSend
-            ? .mail(MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger")))
-            : .share(ShareItem(url: url))
-        sheet = next
     }
 
     private func exportButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -216,7 +188,6 @@ struct TripDetailView: View {
                         if !trip.isOngoing {
                             exportButton("Exporter pour Google Sheets (.xlsx)", icon: "tablecells") { exportSheet(trip) }
                             exportButton("Exporter en PDF (avec carte)", icon: "doc.richtext") { exportPDF(trip) }
-                            exportButton("Envoyer le CSV par e-mail", icon: "envelope") { exportCSV(trip) }
                         }
                         Button {
                             confirmDelete = true
@@ -241,14 +212,6 @@ struct TripDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(tr("Modifier le trajet")) { sheet = .editTrip }
-                    Button(tr("Envoyer le CSV par e-mail")) {
-                        if let trip = trip, let url = CsvExporter.tripCSV(trip) {
-                            let next: DetailSheet = MailComposer.canSend
-                                ? .mail(MailItem(url: url, subject: tr("Export CSV Ultimate Trip Logger")))
-                                : .share(ShareItem(url: url))
-                            sheet = next
-                        }
-                    }
                     Button(tr("Exporter pour Google Sheets (.xlsx)")) {
                         if let trip = trip,
                            let url = XlsxExporter.workbook(trips: [trip], name: "Trajet.xlsx") {
@@ -270,7 +233,6 @@ struct TripDetailView: View {
         .sheet(item: $sheet) { which in
             switch which {
             case .share(let item): ShareSheet(url: item.url)
-            case .mail(let item): MailComposer(item: item, onDismiss: { sheet = nil })
             case .editTrip: TripEditSheet(store: store, tripId: tripId)
             case .editStage(let id): StageEditSheet(store: store, tripId: tripId, stageId: id)
             }

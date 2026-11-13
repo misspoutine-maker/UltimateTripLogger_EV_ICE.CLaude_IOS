@@ -472,7 +472,7 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         }
     }
 
-    func endTrip(endSoc: Int?) {
+    func endTrip(endSoc: Int?, place: String = "") {
         guard isTracking, var t = trip else { return }
         if activeStop != nil {
             finishStop(place: "", kwh: 0, cost: 0, network: "", notes: "", startSoc: nil, endSoc: nil)
@@ -480,7 +480,11 @@ final class TrackingManager: NSObject, ObservableObject, CLLocationManagerDelega
         }
         let now = Date()
         var arrival = Stage(type: .arrival)
-        arrival.placeName = city == TrackingManager.placeholderCity ? tr("Arrivée") : city
+        if !place.isEmpty {
+            arrival.placeName = place
+        } else {
+            arrival.placeName = city == TrackingManager.placeholderCity ? tr("Arrivée") : city
+        }
         arrival.address = address
         arrival.arrival = now
         arrival.departure = now

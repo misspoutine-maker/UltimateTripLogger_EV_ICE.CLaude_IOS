@@ -13,8 +13,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.bebeluga.ultimatetriplogger
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1"
-        MARKETING_VERSION: "9.0"
-        CURRENT_PROJECT_VERSION: "9"
+        MARKETING_VERSION: "10.0"
+        CURRENT_PROJECT_VERSION: "10"
         GENERATE_INFOPLIST_FILE: NO
     info:
       path: Sources/Info.plist
